@@ -1,0 +1,16 @@
+[package]
+name = "biscuit-auth-cli"
+version = "0.1.0"
+authors = ["Clement Delafargue <clement@delafargue.name>"]
+edition = "2018"
+
+[[bin]]
+name = "biscuit"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+biscuit-auth = { git = "https://github.com/CleverCloud/biscuit-rust", branch = "master" }
+hex = "0.4.3"
+structopt = "0.3"
