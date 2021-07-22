@@ -13,4 +13,4 @@ path = "src/main.rs"
 [dependencies]
 biscuit-auth = { git = "https://github.com/CleverCloud/biscuit-rust", branch = "master" }
 hex = "0.4.3"
-structopt = "0.3"
+clap = "3.0.0-beta.2"
