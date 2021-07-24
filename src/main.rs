@@ -486,7 +486,16 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
-    println!("{}", biscuit.print());
+    for i in 0..biscuit.block_count() {
+        if i == 0 {
+            println!("Authority block:");
+        } else {
+            println!("Block n°{}:", i);
+        }
+
+        println!("{}\n==========\n", biscuit.print_block_source(i).unwrap_or_else(String::new));
+    }
+
     let verifier_from = match (&inspect.verify_with, &inspect.verify_with_file) {
         (None, None) => None,
         (Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
