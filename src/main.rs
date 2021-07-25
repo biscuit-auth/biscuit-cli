@@ -486,6 +486,9 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
+    let content_revocation_ids = biscuit.revocation_identifiers();
+    let unique_revocation_ids = biscuit.unique_revocation_identifiers();
+
     for i in 0..biscuit.block_count() {
         if i == 0 {
             println!("Authority block:");
@@ -493,7 +496,24 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
             println!("Block n°{}:", i);
         }
 
-        println!("{}\n==========\n", biscuit.print_block_source(i).unwrap_or_else(String::new));
+        println!("== Datalog ==");
+        println!(
+            "{}",
+            biscuit.print_block_source(i).unwrap_or_else(String::new)
+        );
+
+        println!("== Revocation ids ==");
+        let content_id = content_revocation_ids
+            .get(i)
+            .map(|bytes| hex::encode(&bytes))
+            .unwrap_or("n/a".to_owned());
+        let unique_id = unique_revocation_ids
+            .get(i)
+            .map(|bytes| hex::encode(&bytes))
+            .unwrap_or("n/a".to_owned());
+        println!("Content-based: {}", &content_id);
+        println!("Unique:        {}", &unique_id);
+        println!("\n==========\n");
     }
 
     let verifier_from = match (&inspect.verify_with, &inspect.verify_with_file) {
