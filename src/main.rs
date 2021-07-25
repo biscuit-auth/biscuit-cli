@@ -4,6 +4,7 @@ use biscuit_auth::token::builder::{BiscuitBuilder, BlockBuilder};
 use biscuit_auth::token::verifier::Verifier;
 use biscuit_auth::token::Biscuit;
 use clap::{AppSettings, Clap};
+use std::env;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
@@ -11,6 +12,8 @@ use std::fs;
 use std::io::Write;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::process::Command;
+use tempfile;
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Clap)]
@@ -70,9 +73,9 @@ struct KeyPairCmd {
 /// Generate a biscuit from a private key and an authority block
 #[derive(Clap)]
 struct Generate {
-    /// Read the authority block from the given file (or use `-` to read from stdin)
+    /// Read the authority block from the given file (or use `-` to read from stdin). If omitted, an interactive $EDITOR will be opened.
     #[clap(parse(from_os_str))]
-    authority_file: PathBuf,
+    authority_file: Option<PathBuf>,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     raw: bool,
@@ -107,16 +110,11 @@ struct Attenuate {
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     raw_output: bool,
-    /// The block to append to the token
-    #[clap(long, required_unless_present("block-file"))]
+    /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+    #[clap(long)]
     block: Option<String>,
-    /// The block to append to the token
-    #[clap(
-        long,
-        parse(from_os_str),
-        required_unless_present("block"),
-        conflicts_with = "block"
-    )]
+    /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+    #[clap(long, parse(from_os_str), conflicts_with = "block")]
     block_file: Option<PathBuf>,
     /// The optional context string attached to the new block
     #[clap(long)]
@@ -141,11 +139,26 @@ struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     raw_public_key: bool,
-    /// Verify the biscuit with the provided verifier
-    #[clap(long, conflicts_with("verify-with"))]
+    /// Open $EDITOR to provide a verifier.
+    #[clap(
+        long,
+        conflicts_with("verify-with"),
+        conflicts_with("verify-with-file")
+    )]
+    verify_interactive: bool,
+    /// Verify the biscuit with the provided verifier.
+    #[clap(
+        long,
+        conflicts_with("verify-with"),
+        conflicts_with("verify-interactive")
+    )]
     verify_with_file: Option<PathBuf>,
     /// Verify the biscuit with the provided verifier
-    #[clap(long, conflicts_with("verify-with-file"))]
+    #[clap(
+        long,
+        conflicts_with("verify-with-file"),
+        conflicts_with("verify-interactive")
+    )]
     verify_with: Option<String>,
 }
 
@@ -178,6 +191,7 @@ pub enum KeyBytes {
 }
 
 pub enum DatalogInput {
+    FromEditor,
     FromStdin,
     FromFile(PathBuf),
     DatalogString(String),
@@ -208,12 +222,35 @@ fn read_stdin_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(buffer)
 }
 
+fn read_editor_string() -> Result<String, Box<dyn Error>> {
+    let file = tempfile::Builder::new().suffix(".datalog").tempfile()?;
+    let path = &file.path();
+
+    let editor = match env::var("EDITOR") {
+        Ok(e) => Ok(e),
+        Err(env::VarError::NotPresent) => Ok("vim".to_owned()),
+        e => e,
+    }?;
+
+    let result = Command::new(&editor).arg(&path).spawn()?.wait()?;
+
+    if result.success() {
+        Ok(fs::read_to_string(&path)?)
+    } else {
+        Err(E {
+            msg: "Failed reading the datalog temporary file".to_owned(),
+        }
+        .into())
+    }
+}
+
 fn read_authority_from(
     from: &DatalogInput,
     context: &Option<String>,
     builder: &mut BiscuitBuilder,
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
+        DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string()?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
@@ -250,6 +287,7 @@ fn read_block_from(
     builder: &mut BlockBuilder,
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
+        DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string()?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
@@ -282,6 +320,7 @@ fn read_block_from(
 
 fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<(), Box<dyn Error>> {
     let string = match from {
+        DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string()?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
@@ -516,10 +555,15 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         println!("\n==========\n");
     }
 
-    let verifier_from = match (&inspect.verify_with, &inspect.verify_with_file) {
-        (None, None) => None,
-        (Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
-        (None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
+    let verifier_from = match (
+        &inspect.verify_interactive,
+        &inspect.verify_with,
+        &inspect.verify_with_file,
+    ) {
+        (false, None, None) => None,
+        (true, None, None) => Some(DatalogInput::FromEditor),
+        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
+        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
         // the other combinations are prevented by clap
         _ => unreachable!(),
     };
@@ -544,11 +588,12 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
 }
 
 fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
-    let authority_from = if generate.authority_file == PathBuf::from("-") {
-        DatalogInput::FromStdin
-    } else {
-        DatalogInput::FromFile(generate.authority_file.clone())
+    let authority_from = match &generate.authority_file {
+        Some(path) if path == &PathBuf::from("-") => DatalogInput::FromStdin,
+        Some(path) => DatalogInput::FromFile(path.to_path_buf()),
+        None => DatalogInput::FromEditor,
     };
+
     let private_key: Result<PrivateKey, Box<dyn Error>> = read_private_key_from(&match (
         &generate.private_key,
         &generate.private_key_file,
@@ -593,6 +638,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
     let block_from = match (&attenuate.block_file, &attenuate.block) {
         (Some(file), None) => DatalogInput::FromFile(file.to_path_buf()),
         (None, Some(str)) => DatalogInput::DatalogString(str.to_owned()),
+        (None, None) => DatalogInput::FromEditor,
         // the other combinations are prevented by clap
         _ => unreachable!(),
     };
