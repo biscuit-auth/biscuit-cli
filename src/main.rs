@@ -223,7 +223,9 @@ fn read_stdin_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
 }
 
 fn read_editor_string() -> Result<String, Box<dyn Error>> {
-    let file = tempfile::Builder::new().suffix(".datalog").tempfile()?;
+    let file = tempfile::Builder::new()
+        .suffix(".biscuit-datalog")
+        .tempfile()?;
     let path = &file.path();
 
     let editor = match env::var("EDITOR") {
