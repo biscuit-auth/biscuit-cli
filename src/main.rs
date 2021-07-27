@@ -13,7 +13,6 @@ use std::io::Write;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::Command;
-use tempfile;
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Clap)]
@@ -547,11 +546,11 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         let content_id = content_revocation_ids
             .get(i)
             .map(|bytes| hex::encode(&bytes))
-            .unwrap_or("n/a".to_owned());
+            .unwrap_or_else(|| "n/a".to_owned());
         let unique_id = unique_revocation_ids
             .get(i)
             .map(|bytes| hex::encode(&bytes))
-            .unwrap_or("n/a".to_owned());
+            .unwrap_or_else(|| "n/a".to_owned());
         println!("Content-based: {}", &content_id);
         println!("Unique:        {}", &unique_id);
         println!("\n==========\n");
