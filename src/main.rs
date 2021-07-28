@@ -326,7 +326,6 @@ fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<()
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    println!("{}", &string);
     let (remaining, result) = parse_source(&string).map_err(|_| E {
         msg: "parse error".into(),
     })?;
@@ -577,6 +576,7 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
             let mut verifier_builder = biscuit.verify(key)?;
             read_verifier_from(&verif_from, &mut verifier_builder)?;
             verifier_builder.verify()?;
+            println!("Datalog check succeeded");
         }
     } else if verifier_from.is_some() {
         return Err(E {
