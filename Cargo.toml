@@ -1,8 +1,11 @@
 [package]
 name = "biscuit-auth-cli"
 version = "0.1.0"
+description = "a CLI to manipulate biscuit tokens"
 authors = ["Clement Delafargue <clement@delafargue.name>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/biscuit-auth/biscuit-cli"
 
 [[bin]]
 name = "biscuit"
