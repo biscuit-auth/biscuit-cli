@@ -196,6 +196,27 @@ pub enum DatalogInput {
     DatalogString(String),
 }
 
+fn ensure_no_input_conflict(
+    datalog: &DatalogInput,
+    biscuit: &BiscuitBytes,
+) -> Result<(), Box<dyn Error>> {
+    match (datalog, biscuit) {
+        // running $EDITOR as a child process requires a working stdin. When contents from stdin has already been read, this is
+        // not the case. This could be handled by reopening stdin on /dev/tty, but it's not portable (and as such, more complicated
+        // to do in rust than just disallowing a fringe use-case)
+        (DatalogInput::FromEditor, BiscuitBytes::FromStdin(_)) => Err(E {
+            msg: "I cannot read input from both stdin and an interactive editor. Please use proper files or flags instead.".to_owned(),
+        }
+        .into()),
+        // this combination should be prevented by the clap configuration
+        (DatalogInput::FromStdin, BiscuitBytes::FromStdin(_)) => Err(E {
+            msg: "I cannot read several pieces of input from stdin at the same time. Please use proper files or flags instead.".to_owned(),
+        }
+        .into()),
+        _ => Ok(()),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct E {
     msg: String,
@@ -523,6 +544,23 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         _ => unreachable!(),
     };
 
+    let verifier_from = match (
+        &inspect.verify_interactive,
+        &inspect.verify_with,
+        &inspect.verify_with_file,
+    ) {
+        (false, None, None) => None,
+        (true, None, None) => Some(DatalogInput::FromEditor),
+        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
+        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
+        // the other combinations are prevented by clap
+        _ => unreachable!(),
+    };
+
+    if let Some(vf) = &verifier_from {
+        ensure_no_input_conflict(&vf, &biscuit_from)?;
+    }
+
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
@@ -555,18 +593,6 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         println!("\n==========\n");
     }
 
-    let verifier_from = match (
-        &inspect.verify_interactive,
-        &inspect.verify_with,
-        &inspect.verify_with_file,
-    ) {
-        (false, None, None) => None,
-        (true, None, None) => Some(DatalogInput::FromEditor),
-        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
-        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
-        // the other combinations are prevented by clap
-        _ => unreachable!(),
-    };
     if let Some(key_from) = public_key_from {
         let key = read_public_key_from(&key_from)?;
         let _ = biscuit.check_root_key(key)?;
@@ -643,6 +669,8 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
         // the other combinations are prevented by clap
         _ => unreachable!(),
     };
+
+    ensure_no_input_conflict(&block_from, &biscuit_from)?;
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
     let mut block_builder = biscuit.create_block();
