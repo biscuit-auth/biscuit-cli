@@ -1,3 +1,4 @@
+use atty::Stream;
 use biscuit_auth::crypto::{KeyPair, PrivateKey, PublicKey};
 use biscuit_auth::parser::{parse_block_source, parse_source};
 use biscuit_auth::token::builder::{BiscuitBuilder, BlockBuilder};
@@ -230,13 +231,19 @@ impl Display for E {
 
 impl Error for E {}
 
-fn read_stdin_string() -> Result<String, Box<dyn Error>> {
+fn read_stdin_string(desc: &str) -> Result<String, Box<dyn Error>> {
+    if atty::is(Stream::Stdin) && atty::is(Stream::Stderr) {
+        eprintln!("Please input a {}, followed by <enter> and ^D", &desc);
+    }
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
     Ok(buffer.trim().to_owned())
 }
 
 fn read_stdin_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
+    if atty::is(Stream::Stdin) {
+        return Err(E { msg: "Can't read binary content from an interactive terminal. Please pipe the content or use a proper file.".to_owned() }.into());
+    }
     let mut buffer = Vec::new();
     io::stdin().read_to_end(&mut buffer).map(|_| ())?;
     Ok(buffer)
@@ -247,6 +254,13 @@ fn read_editor_string() -> Result<String, Box<dyn Error>> {
         .suffix(".biscuit-datalog")
         .tempfile()?;
     let path = &file.path();
+
+    if atty::isnt(Stream::Stdin) || atty::isnt(Stream::Stdout) {
+        return Err(E {
+            msg: "Can't start an editor outside of an interactive terminal.".to_owned(),
+        }
+        .into());
+    }
 
     let editor = match env::var("EDITOR") {
         Ok(e) => Ok(e),
@@ -273,7 +287,7 @@ fn read_authority_from(
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -310,7 +324,7 @@ fn read_block_from(
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -343,7 +357,7 @@ fn read_block_from(
 fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -378,7 +392,7 @@ fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey, Box<dyn Error>> 
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes(),
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string()?).map_err(|e| e.into())
+            hex::decode(read_stdin_string("hex-encoded private key")?).map_err(|e| e.into())
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => fs::read(&path).map_err(|e| e.into()),
         KeyBytes::FromFile(KeyFormat::HexKey, path) => {
@@ -398,7 +412,7 @@ fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey, Box<dyn Error>> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes(),
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string()?).map_err(|e| e.into())
+            hex::decode(read_stdin_string("hex-encoded public key")?).map_err(|e| e.into())
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => fs::read(&path).map_err(|e| e.into()),
         KeyBytes::FromFile(KeyFormat::HexKey, path) => {
@@ -420,7 +434,8 @@ fn read_biscuit_from(from: &BiscuitBytes) -> Result<Biscuit, Box<dyn Error>> {
             Biscuit::from(&read_stdin_bytes()?).map_err(|e| e.into())
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
-            Biscuit::from_base64(&read_stdin_string()?).map_err(|e| e.into())
+            Biscuit::from_base64(&read_stdin_string("base64-encoded biscuit")?)
+                .map_err(|e| e.into())
         }
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
             Biscuit::from(&fs::read(&path)?).map_err(|e| e.into())
