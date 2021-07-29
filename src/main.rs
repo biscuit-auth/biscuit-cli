@@ -54,7 +54,7 @@ struct KeyPairCmd {
     #[clap(long, parse(from_os_str))]
     from_private_key_file: Option<PathBuf>,
     /// Read the private key raw bytes directly, with no hex decoding
-    #[clap(long, requires("private-key-file"))]
+    #[clap(long, requires("from-private-key-file"))]
     from_raw_private_key: bool,
     /// Only output the public part of the key pair
     #[clap(long, conflicts_with("only-private-key"))]
