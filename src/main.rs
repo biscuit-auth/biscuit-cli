@@ -1,3 +1,4 @@
+use atty::Stream;
 use biscuit_auth::crypto::{KeyPair, PrivateKey, PublicKey};
 use biscuit_auth::parser::{parse_block_source, parse_source};
 use biscuit_auth::token::builder::{BiscuitBuilder, BlockBuilder};
@@ -53,7 +54,7 @@ struct KeyPairCmd {
     #[clap(long, parse(from_os_str))]
     from_private_key_file: Option<PathBuf>,
     /// Read the private key raw bytes directly, with no hex decoding
-    #[clap(long, requires("private-key-file"))]
+    #[clap(long, requires("from-private-key-file"))]
     from_raw_private_key: bool,
     /// Only output the public part of the key pair
     #[clap(long, conflicts_with("only-private-key"))]
@@ -196,6 +197,27 @@ pub enum DatalogInput {
     DatalogString(String),
 }
 
+fn ensure_no_input_conflict(
+    datalog: &DatalogInput,
+    biscuit: &BiscuitBytes,
+) -> Result<(), Box<dyn Error>> {
+    match (datalog, biscuit) {
+        // running $EDITOR as a child process requires a working stdin. When contents from stdin has already been read, this is
+        // not the case. This could be handled by reopening stdin on /dev/tty, but it's not portable (and as such, more complicated
+        // to do in rust than just disallowing a fringe use-case)
+        (DatalogInput::FromEditor, BiscuitBytes::FromStdin(_)) => Err(E {
+            msg: "I cannot read input from both stdin and an interactive editor. Please use proper files or flags instead.".to_owned(),
+        }
+        .into()),
+        // this combination should be prevented by the clap configuration
+        (DatalogInput::FromStdin, BiscuitBytes::FromStdin(_)) => Err(E {
+            msg: "I cannot read several pieces of input from stdin at the same time. Please use proper files or flags instead.".to_owned(),
+        }
+        .into()),
+        _ => Ok(()),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct E {
     msg: String,
@@ -209,13 +231,19 @@ impl Display for E {
 
 impl Error for E {}
 
-fn read_stdin_string() -> Result<String, Box<dyn Error>> {
+fn read_stdin_string(desc: &str) -> Result<String, Box<dyn Error>> {
+    if atty::is(Stream::Stdin) && atty::is(Stream::Stderr) {
+        eprintln!("Please input a {}, followed by <enter> and ^D", &desc);
+    }
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
     Ok(buffer.trim().to_owned())
 }
 
 fn read_stdin_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
+    if atty::is(Stream::Stdin) {
+        return Err(E { msg: "Can't read binary content from an interactive terminal. Please pipe the content or use a proper file.".to_owned() }.into());
+    }
     let mut buffer = Vec::new();
     io::stdin().read_to_end(&mut buffer).map(|_| ())?;
     Ok(buffer)
@@ -226,6 +254,13 @@ fn read_editor_string() -> Result<String, Box<dyn Error>> {
         .suffix(".biscuit-datalog")
         .tempfile()?;
     let path = &file.path();
+
+    if atty::isnt(Stream::Stdin) || atty::isnt(Stream::Stdout) {
+        return Err(E {
+            msg: "Can't start an editor outside of an interactive terminal.".to_owned(),
+        }
+        .into());
+    }
 
     let editor = match env::var("EDITOR") {
         Ok(e) => Ok(e),
@@ -252,7 +287,7 @@ fn read_authority_from(
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -289,7 +324,7 @@ fn read_block_from(
 ) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -322,7 +357,7 @@ fn read_block_from(
 fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
-        DatalogInput::FromStdin => read_stdin_string()?,
+        DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
@@ -357,7 +392,7 @@ fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey, Box<dyn Error>> 
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes(),
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string()?).map_err(|e| e.into())
+            hex::decode(read_stdin_string("hex-encoded private key")?).map_err(|e| e.into())
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => fs::read(&path).map_err(|e| e.into()),
         KeyBytes::FromFile(KeyFormat::HexKey, path) => {
@@ -377,7 +412,7 @@ fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey, Box<dyn Error>> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes(),
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string()?).map_err(|e| e.into())
+            hex::decode(read_stdin_string("hex-encoded public key")?).map_err(|e| e.into())
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => fs::read(&path).map_err(|e| e.into()),
         KeyBytes::FromFile(KeyFormat::HexKey, path) => {
@@ -399,7 +434,8 @@ fn read_biscuit_from(from: &BiscuitBytes) -> Result<Biscuit, Box<dyn Error>> {
             Biscuit::from(&read_stdin_bytes()?).map_err(|e| e.into())
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
-            Biscuit::from_base64(&read_stdin_string()?).map_err(|e| e.into())
+            Biscuit::from_base64(&read_stdin_string("base64-encoded biscuit")?)
+                .map_err(|e| e.into())
         }
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
             Biscuit::from(&fs::read(&path)?).map_err(|e| e.into())
@@ -523,6 +559,23 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         _ => unreachable!(),
     };
 
+    let verifier_from = match (
+        &inspect.verify_interactive,
+        &inspect.verify_with,
+        &inspect.verify_with_file,
+    ) {
+        (false, None, None) => None,
+        (true, None, None) => Some(DatalogInput::FromEditor),
+        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
+        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
+        // the other combinations are prevented by clap
+        _ => unreachable!(),
+    };
+
+    if let Some(vf) = &verifier_from {
+        ensure_no_input_conflict(&vf, &biscuit_from)?;
+    }
+
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
@@ -555,18 +608,6 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         println!("\n==========\n");
     }
 
-    let verifier_from = match (
-        &inspect.verify_interactive,
-        &inspect.verify_with,
-        &inspect.verify_with_file,
-    ) {
-        (false, None, None) => None,
-        (true, None, None) => Some(DatalogInput::FromEditor),
-        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
-        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
-        // the other combinations are prevented by clap
-        _ => unreachable!(),
-    };
     if let Some(key_from) = public_key_from {
         let key = read_public_key_from(&key_from)?;
         let _ = biscuit.check_root_key(key)?;
@@ -643,6 +684,8 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
         // the other combinations are prevented by clap
         _ => unreachable!(),
     };
+
+    ensure_no_input_conflict(&block_from, &biscuit_from)?;
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
     let mut block_builder = biscuit.create_block();
