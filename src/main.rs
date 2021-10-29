@@ -1,10 +1,10 @@
 use atty::Stream;
-use biscuit_auth::crypto::{KeyPair, PrivateKey, PublicKey};
-use biscuit_auth::parser::{parse_block_source, parse_source};
-use biscuit_auth::token::builder::{BiscuitBuilder, BlockBuilder};
-use biscuit_auth::token::verifier::Verifier;
-use biscuit_auth::token::Biscuit;
-use clap::{AppSettings, Clap};
+use biscuit_auth::{
+    builder::{BiscuitBuilder, BlockBuilder},
+    parser::{parse_block_source, parse_source},
+    Authorizer, Biscuit, UnverifiedBiscuit, {KeyPair, PrivateKey, PublicKey},
+};
+use clap::{AppSettings, Parser};
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -16,9 +16,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "1.0", author = "Clément D. <clement@delafargue.name>")]
-#[clap(setting = AppSettings::ColoredHelp)]
 struct Opts {
     // /// Sets a custom config file. Could have been an Option<T> with no default too
     // #[clap(short, long, default_value = "default.conf")]
@@ -32,7 +31,7 @@ struct Opts {
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 enum SubCommand {
     #[clap(name = "keypair")]
     KeyPairCmd(KeyPairCmd),
@@ -45,7 +44,7 @@ enum SubCommand {
 }
 
 /// Create and manipulate key pairs
-#[derive(Clap)]
+#[derive(Parser)]
 struct KeyPairCmd {
     /// Generate the keypair from the given private key. If omitted, a random keypair will be generated
     #[clap(long, conflicts_with("from-private-key-file"))]
@@ -71,7 +70,7 @@ struct KeyPairCmd {
 }
 
 /// Generate a biscuit from a private key and an authority block
-#[derive(Clap)]
+#[derive(Parser)]
 struct Generate {
     /// Read the authority block from the given file (or use `-` to read from stdin). If omitted, an interactive $EDITOR will be opened.
     #[clap(parse(from_os_str))]
@@ -99,7 +98,7 @@ struct Generate {
 }
 
 /// Attenuate an existing biscuit by adding a new block
-#[derive(Clap)]
+#[derive(Parser)]
 struct Attenuate {
     /// Read the biscuit from the given file (or use `-` to read from stdin)
     #[clap(parse(from_os_str))]
@@ -122,7 +121,7 @@ struct Attenuate {
 }
 
 /// Inspect a biscuit and optionally check its public key
-#[derive(Clap)]
+#[derive(Parser)]
 struct Inspect {
     /// Read the biscuit from the given file (or use `-` to read from stdin)
     #[clap(parse(from_os_str))]
@@ -139,21 +138,21 @@ struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     raw_public_key: bool,
-    /// Open $EDITOR to provide a verifier.
+    /// Open $EDITOR to provide a authorizer.
     #[clap(
         long,
         conflicts_with("verify-with"),
         conflicts_with("verify-with-file")
     )]
     verify_interactive: bool,
-    /// Verify the biscuit with the provided verifier.
+    /// Verify the biscuit with the provided authorizer.
     #[clap(
         long,
         conflicts_with("verify-with"),
         conflicts_with("verify-interactive")
     )]
     verify_with_file: Option<PathBuf>,
-    /// Verify the biscuit with the provided verifier
+    /// Verify the biscuit with the provided authorizer
     #[clap(
         long,
         conflicts_with("verify-with-file"),
@@ -354,7 +353,10 @@ fn read_block_from(
     Ok(())
 }
 
-fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<(), Box<dyn Error>> {
+fn read_authorizer_from(
+    from: &DatalogInput,
+    authorizer: &mut Authorizer,
+) -> Result<(), Box<dyn Error>> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -371,18 +373,18 @@ fn read_verifier_from(from: &DatalogInput, verifier: &mut Verifier) -> Result<()
         .into());
     }
     for (fact_str, _) in result.facts {
-        verifier.add_fact(fact_str)?;
+        authorizer.add_fact(fact_str)?;
     }
     for (rule_str, _) in result.rules {
         println!("{}", &rule_str);
-        verifier.add_rule(rule_str)?;
+        authorizer.add_rule(rule_str)?;
     }
     for (check_str, _) in result.checks {
-        verifier.add_check(check_str)?;
+        authorizer.add_check(check_str)?;
     }
 
     for (policy_str, _) in result.policies {
-        verifier.add_policy(policy_str)?;
+        authorizer.add_policy(policy_str)?;
     }
 
     Ok(())
@@ -400,9 +402,9 @@ fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey, Box<dyn Error>> 
         }
         KeyBytes::HexString(str) => hex::decode(&str).map_err(|e| e.into()),
     };
-    PrivateKey::from_bytes(&bytes?).ok_or_else(|| {
+    PrivateKey::from_bytes(&bytes?).map_err(|e| {
         E {
-            msg: "invalid private key".into(),
+            msg: format!("invalid private key: {}", e),
         }
         .into()
     })
@@ -420,30 +422,32 @@ fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey, Box<dyn Error>> {
         }
         KeyBytes::HexString(str) => hex::decode(&str).map_err(|e| e.into()),
     };
-    PublicKey::from_bytes(&bytes?).ok_or_else(|| {
+    PublicKey::from_bytes(&bytes?).map_err(|e| {
         E {
-            msg: "invalid public key".into(),
+            msg: format!("invalid public key: {}", e),
         }
         .into()
     })
 }
 
-fn read_biscuit_from(from: &BiscuitBytes) -> Result<Biscuit, Box<dyn Error>> {
+fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit, Box<dyn Error>> {
     match from {
         BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => {
-            Biscuit::from(&read_stdin_bytes()?).map_err(|e| e.into())
+            UnverifiedBiscuit::from(&read_stdin_bytes()?).map_err(|e| e.into())
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
-            Biscuit::from_base64(&read_stdin_string("base64-encoded biscuit")?)
+            UnverifiedBiscuit::from_base64(&read_stdin_string("base64-encoded biscuit")?)
                 .map_err(|e| e.into())
         }
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
-            Biscuit::from(&fs::read(&path)?).map_err(|e| e.into())
+            UnverifiedBiscuit::from(&fs::read(&path)?).map_err(|e| e.into())
         }
         BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
-            Biscuit::from_base64(fs::read_to_string(&path)?.trim()).map_err(|e| e.into())
+            UnverifiedBiscuit::from_base64(fs::read_to_string(&path)?.trim()).map_err(|e| e.into())
         }
-        BiscuitBytes::Base64String(str) => Biscuit::from_base64(&str).map_err(|e| e.into()),
+        BiscuitBytes::Base64String(str) => {
+            UnverifiedBiscuit::from_base64(&str).map_err(|e| e.into())
+        }
     }
 }
 
@@ -559,7 +563,7 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         _ => unreachable!(),
     };
 
-    let verifier_from = match (
+    let authorizer_from = match (
         &inspect.verify_interactive,
         &inspect.verify_with,
         &inspect.verify_with_file,
@@ -572,56 +576,52 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         _ => unreachable!(),
     };
 
-    if let Some(vf) = &verifier_from {
+    if let Some(vf) = &authorizer_from {
         ensure_no_input_conflict(&vf, &biscuit_from)?;
     }
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
-    let unique_revocation_ids = biscuit.unique_revocation_identifiers();
 
+    println!("== Revocation ids ==");
     for i in 0..biscuit.block_count() {
-        if i == 0 {
-            println!("Authority block:");
-        } else {
-            println!("Block n°{}:", i);
-        }
-
-        println!("== Datalog ==");
-        println!(
-            "{}",
-            biscuit.print_block_source(i).unwrap_or_else(String::new)
-        );
-
-        println!("== Revocation ids ==");
         let content_id = content_revocation_ids
             .get(i)
             .map(|bytes| hex::encode(&bytes))
             .unwrap_or_else(|| "n/a".to_owned());
-        let unique_id = unique_revocation_ids
-            .get(i)
-            .map(|bytes| hex::encode(&bytes))
-            .unwrap_or_else(|| "n/a".to_owned());
-        println!("Content-based: {}", &content_id);
-        println!("Unique:        {}", &unique_id);
-        println!("\n==========\n");
+        println!("{}", &content_id);
     }
+    println!("\n==========\n");
 
     if let Some(key_from) = public_key_from {
         let key = read_public_key_from(&key_from)?;
-        let _ = biscuit.check_root_key(key)?;
+        let biscuit = biscuit.check_signature(|_| key)?;
         println!("Public key check succeeded");
 
-        if let Some(verif_from) = verifier_from {
-            let mut verifier_builder = biscuit.verify(key)?;
-            read_verifier_from(&verif_from, &mut verifier_builder)?;
-            verifier_builder.verify()?;
+        for i in 0..biscuit.block_count() {
+            if i == 0 {
+                println!("Authority block:");
+            } else {
+                println!("Block n°{}:", i);
+            }
+
+            println!("== Datalog ==");
+            println!(
+                "{}",
+                biscuit.print_block_source(i).unwrap_or_else(String::new)
+            );
+        }
+
+        if let Some(auth_from) = authorizer_from {
+            let mut authorizer_builder = biscuit.authorizer()?;
+            read_authorizer_from(&auth_from, &mut authorizer_builder)?;
+            authorizer_builder.authorize()?;
             println!("Datalog check succeeded");
         }
-    } else if verifier_from.is_some() {
+    } else if authorizer_from.is_some() {
         return Err(E {
-            msg: "A public key is required when verifying a biscuit".to_owned(),
+            msg: "A public key is required when authorizng a biscuit".to_owned(),
         }
         .into());
     }
@@ -692,8 +692,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
 
     read_block_from(&block_from, &attenuate.context, &mut block_builder)?;
 
-    let block_keypair = KeyPair::new();
-    let new_biscuit = biscuit.append(&block_keypair, block_builder)?;
+    let new_biscuit = biscuit.append(block_builder)?;
     let encoded = if attenuate.raw_output {
         new_biscuit.to_vec()?
     } else {
