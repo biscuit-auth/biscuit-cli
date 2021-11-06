@@ -583,47 +583,57 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
-
-    println!("== Revocation ids ==");
     for i in 0..biscuit.block_count() {
+        if i == 0 {
+            println!("Authority block:");
+        } else {
+            println!("Block n°{}:", i);
+        }
+
+        println!("== Datalog ==");
+        println!(
+            "{}",
+            biscuit.print_block_source(i).unwrap_or_else(String::new)
+        );
+
+        println!("== Revocation id ==");
         let content_id = content_revocation_ids
             .get(i)
             .map(|bytes| hex::encode(&bytes))
             .unwrap_or_else(|| "n/a".to_owned());
         println!("{}", &content_id);
+        println!("\n==========\n");
     }
-    println!("\n==========\n");
 
     if let Some(key_from) = public_key_from {
         let key = read_public_key_from(&key_from)?;
-        let biscuit = biscuit.check_signature(|_| key)?;
-        println!("Public key check succeeded");
-
-        for i in 0..biscuit.block_count() {
-            if i == 0 {
-                println!("Authority block:");
-            } else {
-                println!("Block n°{}:", i);
-            }
-
-            println!("== Datalog ==");
-            println!(
-                "{}",
-                biscuit.print_block_source(i).unwrap_or_else(String::new)
-            );
+        let sig_result = biscuit.check_signature(|_| key);
+        if sig_result.is_err() {
+            println!("❌ Public key check failed 🔑");
         }
+        let biscuit = sig_result?;
+        println!("✅ Public key check succeeded 🔑");
 
         if let Some(auth_from) = authorizer_from {
             let mut authorizer_builder = biscuit.authorizer()?;
             read_authorizer_from(&auth_from, &mut authorizer_builder)?;
-            authorizer_builder.authorize()?;
-            println!("Datalog check succeeded");
+            let authorizer_result = authorizer_builder.authorize();
+            if authorizer_result.is_err() {
+                println!("❌ Datalog check failed 🛡️");
+            } else {
+                println!("✅ Datalog check succeeded 🛡️");
+            }
+        } else {
+            println!("🙈 Datalog check skipped 🛡️");
         }
-    } else if authorizer_from.is_some() {
-        return Err(E {
-            msg: "A public key is required when authorizng a biscuit".to_owned(),
+    } else {
+        println!("🙈 Public key check skipped 🔑");
+        if authorizer_from.is_some() {
+            return Err(E {
+                msg: "A public key is required when authorizng a biscuit".to_owned(),
+            }
+            .into());
         }
-        .into());
     }
 
     Ok(())
