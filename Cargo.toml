@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 atty = "0.2.14"
-biscuit-auth = { git = "https://github.com/CleverCloud/biscuit-rust", branch = "master" }
-clap = "3.0.0-beta.2"
+biscuit-auth = { git = "https://github.com/CleverCloud/biscuit-rust", branch = "2.0" }
+clap = { version = "3.0.0-beta.5", features = ["color"] }
 hex = "0.4.3"
 tempfile = "3.2.0"
