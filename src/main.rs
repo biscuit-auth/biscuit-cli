@@ -4,7 +4,7 @@ use biscuit_auth::{
     parser::{parse_block_source, parse_source},
     Authorizer, Biscuit, UnverifiedBiscuit, {KeyPair, PrivateKey, PublicKey},
 };
-use clap::{AppSettings, Parser};
+use clap::Parser;
 use std::env;
 use std::error::Error;
 use std::fmt;
