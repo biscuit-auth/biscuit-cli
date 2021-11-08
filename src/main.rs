@@ -1,6 +1,7 @@
 use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder},
+    error::{FailedCheck, Logic, RunLimit, Token},
     parser::{parse_block_source, parse_source},
     Authorizer, Biscuit, UnverifiedBiscuit, {KeyPair, PrivateKey, PublicKey},
 };
@@ -618,16 +619,23 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
             let mut authorizer_builder = biscuit.authorizer()?;
             read_authorizer_from(&auth_from, &mut authorizer_builder)?;
             let authorizer_result = authorizer_builder.authorize();
-            if authorizer_result.is_err() {
-                println!("❌ Datalog check failed 🛡️");
-            } else {
-                println!("✅ Datalog check succeeded 🛡️");
+            match authorizer_result {
+                Ok(_) => println!("✅ Authorizer check succeeded 🛡️"),
+                Err(e) => {
+                    println!("❌ Authorizer check failed 🛡️");
+                    match e {
+                        Token::FailedLogic(l) => display_logic_error(&l),
+                        Token::RunLimit(l) => display_run_limit(&l),
+                        _ => {}
+                    }
+                }
             }
         } else {
             println!("🙈 Datalog check skipped 🛡️");
         }
     } else {
         println!("🙈 Public key check skipped 🔑");
+        println!("🙈 Datalog check skipped 🛡️");
         if authorizer_from.is_some() {
             return Err(E {
                 msg: "A public key is required when authorizng a biscuit".to_owned(),
@@ -637,6 +645,38 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn display_logic_error(e: &Logic) {
+    match e {
+        Logic::Deny(i) => println!("The deny policy at index {} was matched", i),
+        Logic::NoMatchingPolicy => println!("No allow policy was matched"),
+        Logic::FailedChecks(checks) => {
+            println!("The following checks failed:");
+            display_failed_checks(checks);
+        }
+        e => println!("An execution error happened during authorization: {:?}", &e),
+    }
+}
+
+fn display_failed_checks(checks: &Vec<FailedCheck>) {
+    for c in checks {
+        match c {
+            FailedCheck::Block(bc) => {
+                let block_name = if bc.block_id == 0 {
+                    "Authority block".to_owned()
+                } else {
+                    format!("Block {}", &bc.block_id)
+                };
+                println!("{} check: {}", &block_name, &bc.rule);
+            }
+            FailedCheck::Authorizer(ac) => println!("Authorizer check: {}", &ac.rule),
+        }
+    }
+}
+
+fn display_run_limit(e: &RunLimit) {
+    println!("The authorizer execution was aborted: {}", &e.to_string());
 }
 
 fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
