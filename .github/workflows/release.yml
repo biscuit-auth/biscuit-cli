@@ -165,13 +165,13 @@ jobs:
         #cp complete/_rg "$staging/complete/"
 
         if [ "${{ matrix.os }}" = "windows-2019" ]; then
-          cp "target/${{ matrix.target }}/release/rg.exe" "$staging/"
+          cp "target/${{ matrix.target }}/release/biscuit.exe" "$staging/"
           7z a "$staging.zip" "$staging"
           echo "ASSET=$staging.zip" >> $GITHUB_ENV
         else
           # The man page is only generated on Unix systems. ¯\_(ツ)_/¯
-          cp "$outdir"/rg.1 "$staging/doc/"
-          cp "target/${{ matrix.target }}/release/rg" "$staging/"
+          #cp "$outdir"/rg.1 "$staging/doc/"
+          cp "target/${{ matrix.target }}/release/biscuit" "$staging/"
           tar czf "$staging.tar.gz" "$staging"
           echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
         fi
