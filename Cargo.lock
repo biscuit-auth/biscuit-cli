@@ -43,7 +43,7 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "biscuit-auth"
 version = "1.1.0"
-source = "git+https://github.com/CleverCloud/biscuit-rust?branch=2.0#9a339aee8d1be2d019f51e9346d87c319f091a7e"
+source = "git+https://github.com/biscuit-auth/biscuit-rust?branch=2.0#472240efbd958550508939cf1542a7e6e81d0516"
 dependencies = [
  "base64",
  "chrono",
