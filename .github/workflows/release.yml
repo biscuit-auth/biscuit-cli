@@ -159,8 +159,8 @@ jobs:
         staging="biscuit-${{ needs.create-release.outputs.biscuit_version }}-${{ matrix.target }}"
         mkdir -p "$staging"/{complete,doc}
 
-        cp {README.md,COPYING,UNLICENSE,LICENSE-MIT} "$staging/"
-        cp {CHANGELOG.md,FAQ.md,GUIDE.md} "$staging/doc/"
+        cp {README.md,LICENSE} "$staging/"
+        #cp {CHANGELOG.md,FAQ.md,GUIDE.md} "$staging/doc/"
         #cp "$outdir"/{rg.bash,rg.fish,_rg.ps1} "$staging/complete/"
         #cp complete/_rg "$staging/complete/"
 
