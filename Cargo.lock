@@ -42,8 +42,9 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "biscuit-auth"
-version = "1.1.0"
-source = "git+https://github.com/CleverCloud/biscuit-rust?branch=2.0#9a339aee8d1be2d019f51e9346d87c319f091a7e"
+version = "2.0.0-beta1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "951158ebcecc3d70f90a807059e0ea586bcfb5afdd357c322705e0ebafd8c920"
 dependencies = [
  "base64",
  "chrono",
