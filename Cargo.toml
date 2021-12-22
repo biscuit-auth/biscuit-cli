@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 atty = "0.2.14"
-biscuit-auth = "2.0.0-beta1"
-clap = { version = "3.0.0-beta.5", features = ["color"] }
+biscuit-auth = "2.0.0-beta5"
+clap = { version = "3.0.0-rc.7", features = ["color", "derive"] }
 hex = "0.4.3"
 tempfile = "3.2.0"
