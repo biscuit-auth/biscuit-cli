@@ -377,7 +377,6 @@ fn read_authorizer_from(
         authorizer.add_fact(fact_str)?;
     }
     for (rule_str, _) in result.rules {
-        println!("{}", &rule_str);
         authorizer.add_rule(rule_str)?;
     }
     for (check_str, _) in result.checks {
