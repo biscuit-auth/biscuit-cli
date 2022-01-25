@@ -262,13 +262,7 @@ fn read_editor_string() -> Result<String, Box<dyn Error>> {
         .into());
     }
 
-    let editor = match env::var("EDITOR") {
-        Ok(e) => Ok(e),
-        Err(env::VarError::NotPresent) => Ok("vim".to_owned()),
-        e => e,
-    }?;
-
-    let result = Command::new(&editor).arg(&path).spawn()?.wait()?;
+    let result = get_editor_command()?.arg(&path).spawn()?.wait()?;
 
     if result.success() {
         Ok(fs::read_to_string(&path)?)
@@ -277,6 +271,26 @@ fn read_editor_string() -> Result<String, Box<dyn Error>> {
             msg: "Failed reading the datalog temporary file".to_owned(),
         }
         .into())
+    }
+}
+
+fn get_editor_command() -> Result<Command, Box<dyn Error>> {
+    let editor_unparsed = match env::var("EDITOR") {
+        Ok(e) => Ok(e),
+        Err(env::VarError::NotPresent) => Ok("vim".to_owned()),
+        e => e,
+    }?;
+
+    let editor_parts = shell_words::split(&editor_unparsed)?;
+    match editor_parts.split_first() {
+        Some((editor_binary, editor_args)) => {
+            let mut editor_cmd = Command::new(editor_binary);
+            editor_cmd.args(editor_args);
+            Ok(editor_cmd)
+        }
+        None => Err(E {
+            msg: "Failed to parse EDITOR environment variable".to_owned(),
+        }.into()),
     }
 }
 
