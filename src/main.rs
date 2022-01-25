@@ -1,7 +1,7 @@
 use atty::Stream;
 use biscuit_auth::{
-    builder::{BiscuitBuilder, BlockBuilder},
-    error::{FailedCheck, Logic, RunLimit, Token},
+    builder::{BiscuitBuilder, BlockBuilder, Policy},
+    error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
     parser::{parse_block_source, parse_source},
     Authorizer, Biscuit, UnverifiedBiscuit, {KeyPair, PrivateKey, PublicKey},
 };
@@ -291,15 +291,10 @@ fn read_authority_from(
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    let (remaining, result) = parse_block_source(&string).map_err(|_| E {
+    let result = parse_block_source(&string).map_err(|_| E {
         msg: "parse error".into(),
     })?;
-    if !remaining.is_empty() {
-        return Err(E {
-            msg: "remaining input".into(),
-        }
-        .into());
-    }
+
     for (fact_str, _) in result.facts {
         builder.add_authority_fact(fact_str)?;
     }
@@ -328,15 +323,10 @@ fn read_block_from(
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    let (remaining, result) = parse_block_source(&string).map_err(|_| E {
+    let result = parse_block_source(&string).map_err(|_| E {
         msg: "parse error".into(),
     })?;
-    if !remaining.is_empty() {
-        return Err(E {
-            msg: "remaining input".into(),
-        }
-        .into());
-    }
+
     for (fact_str, _) in result.facts {
         builder.add_fact(fact_str)?;
     }
@@ -364,15 +354,10 @@ fn read_authorizer_from(
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    let (remaining, result) = parse_source(&string).map_err(|_| E {
+    let result = parse_source(&string).map_err(|_| E {
         msg: "parse error".into(),
     })?;
-    if !remaining.is_empty() {
-        return Err(E {
-            msg: "remaining input".into(),
-        }
-        .into());
-    }
+
     for (fact_str, _) in result.facts {
         authorizer.add_fact(fact_str)?;
     }
@@ -617,13 +602,21 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         if let Some(auth_from) = authorizer_from {
             let mut authorizer_builder = biscuit.authorizer()?;
             read_authorizer_from(&auth_from, &mut authorizer_builder)?;
+            let (_, _, _, policies) = authorizer_builder.dump();
             let authorizer_result = authorizer_builder.authorize();
             match authorizer_result {
-                Ok(_) => println!("✅ Authorizer check succeeded 🛡️"),
+                Ok(i) => {
+                    println!("✅ Authorizer check succeeded 🛡️");
+                    println!(
+                        "Matched allow policy: {}",
+                        policies.get(i).expect("Incorrect policy index")
+                    );
+                }
+
                 Err(e) => {
                     println!("❌ Authorizer check failed 🛡️");
                     match e {
-                        Token::FailedLogic(l) => display_logic_error(&l),
+                        Token::FailedLogic(l) => display_logic_error(&policies, &l),
                         Token::RunLimit(l) => display_run_limit(&l),
                         _ => {}
                     }
@@ -646,19 +639,43 @@ fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn display_logic_error(e: &Logic) {
+fn display_logic_error(policies: &[Policy], e: &Logic) {
     match e {
-        Logic::Deny(i) => println!("The deny policy at index {} was matched", i),
-        Logic::NoMatchingPolicy => println!("No allow policy was matched"),
-        Logic::FailedChecks(checks) => {
-            println!("The following checks failed:");
-            display_failed_checks(checks);
+        Logic::Unauthorized { policy, checks } => {
+            display_matched_policy(policies, &policy);
+            display_failed_checks(&checks);
+        }
+        Logic::NoMatchingPolicy { checks } => {
+            println!("No policy matched");
+            display_failed_checks(&checks);
         }
         e => println!("An execution error happened during authorization: {:?}", &e),
     }
 }
 
+fn display_matched_policy(policies: &[Policy], policy: &MatchedPolicy) {
+    match policy {
+        MatchedPolicy::Allow(i) => {
+            let policy = policies.get(*i);
+            println!(
+                "An allow policy matched: {}",
+                policy.expect("Incorrect policy index")
+            );
+        }
+        MatchedPolicy::Deny(i) => {
+            let policy = policies.get(*i);
+            println!(
+                "A deny policy matched: {}",
+                policy.expect("Incorrect policy index")
+            );
+        }
+    }
+}
+
 fn display_failed_checks(checks: &Vec<FailedCheck>) {
+    if checks.len() > 0 {
+        println!("The following checks failed:");
+    }
     for c in checks {
         match c {
             FailedCheck::Block(bc) => {
@@ -667,9 +684,9 @@ fn display_failed_checks(checks: &Vec<FailedCheck>) {
                 } else {
                     format!("Block {}", &bc.block_id)
                 };
-                println!("{} check: {}", &block_name, &bc.rule);
+                println!("  {} check: {}", &block_name, &bc.rule);
             }
-            FailedCheck::Authorizer(ac) => println!("Authorizer check: {}", &ac.rule),
+            FailedCheck::Authorizer(ac) => println!("  Authorizer check: {}", &ac.rule),
         }
     }
 }
