@@ -145,4 +145,7 @@ pub struct Inspect {
         conflicts_with("verify-interactive")
     )]
     pub verify_with: Option<String>,
+    /// Include the current time in the verifier facts
+    #[clap(long)]
+    pub include_time: bool,
 }

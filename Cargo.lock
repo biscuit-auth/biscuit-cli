@@ -68,6 +68,7 @@ version = "0.1.0"
 dependencies = [
  "atty",
  "biscuit-auth",
+ "chrono",
  "clap",
  "hex",
  "shell-words",
