@@ -1,6 +1,7 @@
 use biscuit_auth::{
     Biscuit, {KeyPair, PrivateKey},
 };
+use chrono::Utc;
 use clap::Parser;
 use std::error::Error;
 use std::io::Write;
@@ -120,6 +121,14 @@ fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
     let root = KeyPair::from(private_key?);
     let mut builder = Biscuit::builder(&root);
     read_authority_from(&authority_from, &generate.context, &mut builder)?;
+
+    if let Some(duration) = generate.add_ttl {
+        let expiration = Utc::now() + duration;
+        builder.add_authority_check::<&str>(&format!(
+            "check if time($t), $t < {}",
+            &expiration.to_rfc3339()
+        ))?;
+    }
     let biscuit = builder.build().expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
         biscuit.to_vec().expect("Error serializing token")
@@ -160,6 +169,14 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
     let mut block_builder = biscuit.create_block();
 
     read_block_from(&block_from, &attenuate.context, &mut block_builder)?;
+
+    if let Some(duration) = attenuate.add_ttl {
+        let expiration = Utc::now() + duration;
+        block_builder.add_check::<&str>(&format!(
+            "check if time($t), $t < {}",
+            &expiration.to_rfc3339()
+        ))?;
+    }
 
     let new_biscuit = biscuit.append(block_builder)?;
     let encoded = if attenuate.raw_output {

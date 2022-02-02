@@ -1,5 +1,8 @@
+use chrono::Duration;
 use clap::Parser;
 use std::path::PathBuf;
+
+use crate::input::*;
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
@@ -81,6 +84,9 @@ pub struct Generate {
     /// The optional context string attached to the authority block
     #[clap(long)]
     pub context: Option<String>,
+    /// Add a TTL check to the generated authority block
+    #[clap(long, parse(try_from_str = parse_duration))]
+    pub add_ttl: Option<Duration>,
 }
 
 /// Attenuate an existing biscuit by adding a new block
@@ -104,6 +110,9 @@ pub struct Attenuate {
     /// The optional context string attached to the new block
     #[clap(long)]
     pub context: Option<String>,
+    /// Add a TTL check to the generated block
+    #[clap(long, parse(try_from_str = parse_duration))]
+    pub add_ttl: Option<Duration>,
 }
 
 /// Inspect a biscuit and optionally check its public key
