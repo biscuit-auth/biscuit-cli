@@ -2,6 +2,7 @@ use biscuit_auth::{
     builder::Policy,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
 };
+use chrono::offset::Utc;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -93,6 +94,11 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         if let Some(auth_from) = authorizer_from {
             let mut authorizer_builder = biscuit.authorizer()?;
             read_authorizer_from(&auth_from, &mut authorizer_builder)?;
+            if inspect.include_time {
+                let now = Utc::now().to_rfc3339();
+                let time_fact = format!("time({})", now);
+                authorizer_builder.add_fact(time_fact.as_ref())?;
+            }
             let (_, _, _, policies) = authorizer_builder.dump();
             let authorizer_result = authorizer_builder.authorize();
             match authorizer_result {

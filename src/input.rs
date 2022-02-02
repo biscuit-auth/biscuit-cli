@@ -4,6 +4,8 @@ use biscuit_auth::{
     parser::{parse_block_source, parse_source},
     Authorizer, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
+use chrono::Duration;
+use parse_duration as duration_parser;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -287,4 +289,14 @@ pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit, Box<d
             UnverifiedBiscuit::from_base64(&str).map_err(|e| e.into())
         }
     }
+}
+
+pub fn parse_duration(str: &str) -> Result<Duration, E> {
+    let std_duration = duration_parser::parse(str).map_err(|_| E {
+        msg: "Could not parse duration".to_string(),
+    })?;
+    let duration = Duration::from_std(std_duration).map_err(|_| E {
+        msg: "Duration outside representable intervals".to_string(),
+    })?;
+    Ok(duration)
 }
