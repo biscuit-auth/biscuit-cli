@@ -33,8 +33,8 @@ Here are a list of common use-cases:
 $ # this will output the keypair, you can then copy/paste the components
 $ biscuit keypair
 > Generating a new random keypair
-> Private key: 4aa4bae701c6eb05cfe0bdd68d5fab236fc0d0d3dcb2a9b582a0d87b23e04500
-> Public key: 687b536c502f10f5978eee2d0c04f2869d15cf7858983dc50b6729b15e203809
+> Private key: d1e3ebc3f522cc2f7bb40c2377830d834c41ebeb0aa54d881a75059704dfa6cb
+> Public key: 80c596ea5a6ade1a2f8e7bf96359732d9274789d8e85c0a0a62adbff16f4b289
 
 $ # this will save the private key to a file so you can use it later
 $ biscuit keypair --only-private-key > private-key-file
@@ -44,7 +44,7 @@ $ biscuit keypair --only-private-key > private-key-file
 
 ```
 $ biscuit keypair --from-private-key-file private-key-file --only-public-key
-> 94cbe231b05dac8ae556c39a3cdc3d12103ad9ed5500eda6098c60e6672bf858
+> 2341bc530d8f074100734a41cc05cc82e4e2564eff61b0408f8e37a08f384767
 ```
 
 ### Create a biscuit token
@@ -52,11 +52,11 @@ $ biscuit keypair --from-private-key-file private-key-file --only-public-key
 ```
 $ # this will open your text editor and let you type in the authority block as datalog
 $ biscuit generate --private-key-file private-key-file
-> ChcIADgBQhEKDwgEEgIIABIHIgVmaWxlMRoglMviMbBdrIrlVsOaPNw9EhA62e1VAO2mCYxg5mcr-FgiRAogKAZh5JjRh6n3UTQIVlptzWsAhj92UaOjWZQOVYYqaTASIFG7bXx0Y35LjRWcJHs7N6CAEOBJOuuainDg4Rg_S8IG
+> En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiB-So8adTv5YLBK49I8MrK1JdrYLrFSiFqUkRkVsco9MhpAJzlkr2xHM4JSlFmph7c9UEJPqw_BCscMgkIasAjnXZT5BHpA58M1uo_4KUDbPZSJVtbF93P43X41W7aofjZXAiIiCiCScR0e_rBUa7VjxnKW4PT52ZjC3peMCrWOi1T0jgR0fw==
 
-$ # this will generate the token directly 
-$ echo 'right(#authority, "file1");' | biscuit generate --private-key-file pkf -
-ChcIADgBQhEKDwgEEgIIABIHIgVmaWxlMRoglMviMbBdrIrlVsOaPNw9EhA62e1VAO2mCYxg5mcr-FgiRAogCCirktOm6gYKHHnjyQ49L7u2YOyxfi9gPQ0q_5_bRXASIBeYUocb2BHGgS3-GJCmgq1sk26YH439UhvnsScrXz4H
+$ # this will generate the token directly
+$ echo 'right("file1");' | biscuit generate --private-key-file private-key-file -
+$ En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiDg91H1_yfDSMrLnfXLowUZsKJDfrC-1XVSPkbikXYy7BpAacFHci_m8X3PffAgeEXVgF3RvwzhE434KWLNpbDYLE1_IOIwsSjRVqFC4fy-NuY9CEqetJ8fHUfo0I7Qs05TDSIiCiDHkAX0s3RgH_wMYDKlE09S2YZM-1cLmFgl5Nh3gvU0bg==
 ```
 
 ### Inspect a biscuit token
@@ -66,16 +66,17 @@ By default, `biscuit` inspect only prints out the biscuit contents (datalog bloc
 ```
 $ # this will inspect the token stored in the given file
 $ biscuit inspect biscuit-file
->
 > Authority block:
 > == Datalog ==
-> right(#authority, "file1");
+> right("file1");
 > 
-> == Revocation ids ==
-> Content-based: de8704ebf3fbd43a976b92c7ae21b396ca9dd493d4ebf95d3a9e899c58587024
-> Unique:        4523e74599e34ab3fa79822f4c213526aa7fcab5d3a84e177d0c4ef92adc482b
+> == Revocation id ==
+> 526c78ffa3819cb71bcade69d6d78f80ad1209f21d2c3326857c66ca8fc19c63a4283929b690ae40ca8474594631caee464b0367b781d3cc1139343c13900509
 > 
 > ==========
+> 
+> 🙈 Public key check skipped 🔑
+> 🙈 Datalog check skipped 🛡️
 ```
 
 A public key can be provided to check the biscuit root key (the command exits with a success code only if the keys match)
@@ -85,15 +86,15 @@ $ # this will make sure the biscuit root key is the same as the one that's provi
 $ biscuit inspect --public-key-file public-key-file biscuit-file
 > Authority block:
 > == Datalog ==
-> right(#authority, "file1");
+> right("file1");
 > 
-> == Revocation ids ==
-> Content-based: de8704ebf3fbd43a976b92c7ae21b396ca9dd493d4ebf95d3a9e899c58587024
-> Unique:        4523e74599e34ab3fa79822f4c213526aa7fcab5d3a84e177d0c4ef92adc482b
+> == Revocation id ==
+> 526c78ffa3819cb71bcade69d6d78f80ad1209f21d2c3326857c66ca8fc19c63a4283929b690ae40ca8474594631caee464b0367b781d3cc1139343c13900509
 > 
 > ==========
 > 
-Public key check succeeded
+> ✅ Public key check succeeded 🔑
+> 🙈 Datalog check skipped 🛡️
 ```
 
 A verifier can be provided to check if the biscuit would be allowed in a given context (the command exits with a success code only if the keys match and if the verification suceeded).
@@ -103,25 +104,25 @@ If you want to use your text editor to type in the verifier, you can use `--veri
 ```
 $ biscuit inspect --public-key-file public-key-file \
                   --verify-with 'allow if right(#authority, "file1");' \
-                  biscuit-file 
+                  biscuit-file
 > Authority block:
 > == Datalog ==
-> right(#authority, "file1");
+> right("file1");
 > 
-> == Revocation ids ==
-> Content-based: de8704ebf3fbd43a976b92c7ae21b396ca9dd493d4ebf95d3a9e899c58587024
-> Unique:        4523e74599e34ab3fa79822f4c213526aa7fcab5d3a84e177d0c4ef92adc482b
+> == Revocation id ==
+> 526c78ffa3819cb71bcade69d6d78f80ad1209f21d2c3326857c66ca8fc19c63a4283929b690ae40ca8474594631caee464b0367b781d3cc1139343c13900509
 > 
 > ==========
 > 
-> Public key check succeeded
-> Datalog check succeeded
+> ✅ Public key check succeeded 🔑
+> ✅ Authorizer check succeeded 🛡️
+> Matched allow policy: allow if right("file1")
 ```
 
 ### Attenuating a biscuit token
 
 ```
 # this will create a new biscuit token with the provided block appended
-$ biscuit attenuate biscuit-file --block 'check if time(#ambient, $0), $0 <= 2021-07-29T14:06:43+00:00;'
-> ChcIADgBQhEKDwgEEgIIABIHIgVmaWxlMRJACAESBXF1ZXJ5EgR0aW1lEgEwOAFSKgooCgIIBxIKCAgSAggBEgIQCRoWCgQKAhAJCggKBiiU7IqIBgoEGgIIAhoglMviMbBdrIrlVsOaPNw9EhA62e1VAO2mCYxg5mcr-FgaIM7CFNnvFB-SeN-VhpPRtZJnUzFM918XulzU8OL1pIc7ImYKIAgoq5LTpuoGChx548kOPS-7tmDssX4vYD0NKv-f20VwCiA-zkpZZjA5vLa-8XL8p6oXvf5A-rUCIcHOyPWR3aogdhIgzB0tA9eSatJU0NiQnQW7HgSr0fjnQqJ4ccKHZlrj-w4=
+$ biscuit attenuate biscuit-file --block 'check if client_ip_address("127.0.0.1);'
+> En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiBrhbrvPUXH9RPOzIwnLVyRWwcK64JQ97kBvz1hLJfjfBpAUmx4_6OBnLcbyt5p1tePgK0SCfIdLDMmhXxmyo_BnGOkKDkptpCuQMqEdFlGMcruRksDZ7eB08wROTQ8E5AFCRqhAQo3CgVxdWVyeQoRY2xpZW50X2lwX2FkZHJlc3MKCTEyNy4wLjAuMRgCMg4KDAoCCAgSBggJEgIYChIkCAASIL6EGw7TZQ-8sRa0RT1U0cW8mjN_GzoW0jwX_67I0zPCGkDL5ho8NPsZwskzJ86e31qR29grjcEQormtv7I3YoQy_I2aoZGNtlviX72FuBT85KlVxJtjOiLxCIOvJj4MVN0KIiIKIM6btYoZ-ONE2gKEJ2raR8Bck7SMBAUf2sK7Z8I7uM_D
 ```

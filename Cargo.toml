@@ -1,11 +1,13 @@
 [package]
-name = "biscuit-auth-cli"
+name = "biscuit-cli"
 version = "0.1.0"
 description = "a CLI to manipulate biscuit tokens"
 authors = ["Clement Delafargue <clement@delafargue.name>"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/biscuit-auth/biscuit-cli"
+homepage = "https://www.biscuitsec.org"
+readme = "README.md"
 
 [[bin]]
 name = "biscuit"
@@ -16,7 +18,7 @@ path = "src/main.rs"
 [dependencies]
 atty = "0.2.14"
 biscuit-auth = "2.0.0"
-clap = { version = "3.0.0-rc.7", features = ["color", "derive"] }
+clap = { version = "^3.0", features = ["color", "derive"] }
 chrono = "^0.4"
 hex = "0.4.3"
 parse_duration = "^2.1"

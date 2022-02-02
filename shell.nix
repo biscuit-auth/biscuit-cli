@@ -1,4 +1,4 @@
-{ pkgs ? import <unstable> {}}: with pkgs;
+{ pkgs ? import <nixpkgs> {}}: with pkgs;
 
 mkShell {
   buildInputs = [
