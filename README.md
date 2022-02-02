@@ -1,6 +1,6 @@
 # Biscuit CLI
 
-This package provides a Command Line Interface allowing to manipulate [biscuit](https://github.com/CleverCloud/biscuit) tokens.
+This package provides a Command Line Interface allowing to manipulate [biscuit](https://github.com/biscuit-auth/biscuit) tokens.
 
 ## Installation
 
