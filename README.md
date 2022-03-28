@@ -4,7 +4,13 @@ This package provides a Command Line Interface allowing to manipulate [biscuit](
 
 ## Installation
 
-This package is not published on [crates.io](https://crates.io) yet, so you need to build it locally:
+You can install [biscuit-cli](https://crates.io/crates/biscuit-cli) with Cargo:
+
+```
+cargo install biscuit-cli
+```
+
+### From source
 
 ```
 git clone https://github.com/biscuit-auth/biscuit-cli.git
