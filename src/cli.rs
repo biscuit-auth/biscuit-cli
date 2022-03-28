@@ -6,7 +6,7 @@ use crate::input::*;
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
-#[clap(version = "1.0", author = "Clément D. <clement@delafargue.name>")]
+#[clap(version = "0.2.0", author = "Clément D. <clement@delafargue.name>")]
 pub struct Opts {
     #[clap(subcommand)]
     pub subcmd: SubCommand,
