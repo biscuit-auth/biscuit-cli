@@ -1,6 +1,7 @@
 use biscuit_auth::{
     builder::Policy,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
+    UnverifiedBiscuit,
 };
 use chrono::offset::Utc;
 use std::error::Error;
@@ -58,6 +59,13 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     }
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
+    let is_sealed = is_sealed(&biscuit)?;
+
+    if is_sealed {
+        println!("Sealed biscuit");
+    } else {
+        println!("Open biscuit");
+    }
 
     let content_revocation_ids = biscuit.revocation_identifiers();
     for i in 0..biscuit.block_count() {
@@ -190,4 +198,12 @@ fn display_failed_checks(checks: &Vec<FailedCheck>) {
 
 fn display_run_limit(e: &RunLimit) {
     println!("The authorizer execution was aborted: {}", &e.to_string());
+}
+
+fn is_sealed(b: &UnverifiedBiscuit) -> Result<bool, Box<dyn Error>> {
+    match b.seal() {
+        Ok(_) => Ok(false),
+        Err(Token::Sealed) => Ok(true),
+        Err(e) => Err(e.into()),
+    }
 }
