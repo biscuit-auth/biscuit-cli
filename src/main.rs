@@ -7,6 +7,7 @@ use std::error::Error;
 use std::io::Write;
 use std::io::{self};
 use std::path::PathBuf;
+use std::process;
 
 mod cli;
 mod errors;
@@ -190,5 +191,11 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
 
 pub fn main() {
     let opts: Opts = Opts::parse();
-    let _ = handle_command(&opts.subcmd).unwrap();
+    match handle_command(&opts.subcmd) {
+        Ok(()) => process::exit(0),
+        Err(e) => {
+            eprintln!("[Error] {}", &e);
+            process::exit(1);
+        }
+    }
 }
