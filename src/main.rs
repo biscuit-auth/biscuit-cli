@@ -24,6 +24,7 @@ fn handle_command(cmd: &SubCommand) -> Result<(), Box<dyn Error>> {
         SubCommand::Inspect(inspect) => handle_inspect(&inspect),
         SubCommand::Generate(generate) => handle_generate(&generate),
         SubCommand::Attenuate(attenuate) => handle_attenuate(&attenuate),
+        SubCommand::Seal(seal) => handle_seal(&seal),
     }
 }
 
@@ -181,6 +182,30 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
 
     let new_biscuit = biscuit.append(block_builder)?;
     let encoded = if attenuate.raw_output {
+        new_biscuit.to_vec()?
+    } else {
+        new_biscuit.to_base64()?.into_bytes()
+    };
+    let _ = io::stdout().write_all(&encoded);
+    Ok(())
+}
+
+fn handle_seal(seal: &Seal) -> Result<(), Box<dyn Error>> {
+    let biscuit_format = if seal.raw_input {
+        BiscuitFormat::RawBiscuit
+    } else {
+        BiscuitFormat::Base64Biscuit
+    };
+
+    let biscuit_from = if seal.biscuit_file == PathBuf::from("-") {
+        BiscuitBytes::FromStdin(biscuit_format)
+    } else {
+        BiscuitBytes::FromFile(biscuit_format, seal.biscuit_file.clone())
+    };
+
+    let biscuit = read_biscuit_from(&biscuit_from)?;
+    let new_biscuit = biscuit.seal()?;
+    let encoded = if seal.raw_output {
         new_biscuit.to_vec()?
     } else {
         new_biscuit.to_base64()?.into_bytes()

@@ -22,6 +22,8 @@ pub enum SubCommand {
     Generate(Generate),
     #[clap()]
     Attenuate(Attenuate),
+    #[clap()]
+    Seal(Seal),
 }
 
 /// Create and manipulate key pairs
@@ -149,4 +151,18 @@ pub struct Inspect {
     /// Include the current time in the verifier facts
     #[clap(long)]
     pub include_time: bool,
+}
+
+/// Seal a token, preventing further attenuation
+#[derive(Parser)]
+pub struct Seal {
+    /// Read the biscuit from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub biscuit_file: PathBuf,
+    /// Read the biscuit raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
+    /// Output the biscuit raw bytes directly, with no base64 encoding
+    #[clap(long)]
+    pub raw_output: bool,
 }
