@@ -120,17 +120,17 @@ fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
     });
 
     let root = KeyPair::from(private_key?);
-    let mut builder = Biscuit::builder(&root);
+    let mut builder = Biscuit::builder();
     read_authority_from(&authority_from, &generate.context, &mut builder)?;
 
     if let Some(duration) = generate.add_ttl {
         let expiration = Utc::now() + duration;
-        builder.add_authority_check::<&str>(&format!(
+        builder.add_check::<&str>(&format!(
             "check if time($t), $t < {}",
             &expiration.to_rfc3339()
         ))?;
     }
-    let biscuit = builder.build().expect("Error building biscuit"); // todo display error
+    let biscuit = builder.build(&root).expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
         biscuit.to_vec().expect("Error serializing token")
     } else {

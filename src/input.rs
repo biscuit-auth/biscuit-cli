@@ -151,13 +151,13 @@ pub fn read_authority_from(
     })?;
 
     for (fact_str, _) in result.facts {
-        builder.add_authority_fact(fact_str)?;
+        builder.add_fact(fact_str)?;
     }
     for (rule_str, _) in result.rules {
-        builder.add_authority_rule(rule_str)?;
+        builder.add_rule(rule_str)?;
     }
     for (check_str, _) in result.checks {
-        builder.add_authority_check(check_str)?;
+        builder.add_check(check_str)?;
     }
 
     if let Some(ctx) = context {
