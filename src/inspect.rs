@@ -68,10 +68,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         }
 
         println!("== Datalog ==");
-        println!(
-            "{}",
-            biscuit.print_block_source(i).unwrap_or_else(String::new)
-        );
+        println!("{}", biscuit.print_block_source(i)?);
 
         println!("== Revocation id ==");
         let content_id = content_revocation_ids

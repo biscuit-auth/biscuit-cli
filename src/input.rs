@@ -2,7 +2,7 @@ use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder},
     parser::{parse_block_source, parse_source},
-    Authorizer, UnverifiedBiscuit, {PrivateKey, PublicKey},
+    Authorizer, Request, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
 use chrono::Duration;
 use parse_duration as duration_parser;
@@ -64,6 +64,19 @@ pub fn ensure_no_input_conflict(
         .into()),
         // this combination should be prevented by the clap configuration
         (DatalogInput::FromStdin, BiscuitBytes::FromStdin(_)) => Err(E {
+            msg: "I cannot read several pieces of input from stdin at the same time. Please use proper files or flags instead.".to_owned(),
+        }
+        .into()),
+        _ => Ok(()),
+    }
+}
+
+pub fn ensure_no_input_conflict_third_party(
+    block: &BiscuitBytes,
+    biscuit: &BiscuitBytes,
+) -> Result<(), Box<dyn Error>> {
+    match (block, biscuit) {
+        (BiscuitBytes::FromStdin(_), BiscuitBytes::FromStdin(_)) => Err(E {
             msg: "I cannot read several pieces of input from stdin at the same time. Please use proper files or flags instead.".to_owned(),
         }
         .into()),
@@ -288,6 +301,48 @@ pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit, Box<d
         BiscuitBytes::Base64String(str) => {
             UnverifiedBiscuit::from_base64(&str).map_err(|e| e.into())
         }
+    }
+}
+
+pub fn read_request_from(from: &BiscuitBytes) -> Result<Request, Box<dyn Error>> {
+    match from {
+        BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => {
+            Request::deserialize(&read_stdin_bytes()?).map_err(|e| e.into())
+        }
+        BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => Request::deserialize_base64(
+            &read_stdin_string("base64-encoded third-party block request")?,
+        )
+        .map_err(|e| e.into()),
+        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
+            Request::deserialize(&fs::read(&path)?).map_err(|e| e.into())
+        }
+        BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
+            Request::deserialize_base64(fs::read_to_string(&path)?.trim()).map_err(|e| e.into())
+        }
+        BiscuitBytes::Base64String(str) => Request::deserialize_base64(&str).map_err(|e| e.into()),
+    }
+}
+
+pub fn append_third_party_from(
+    biscuit: &UnverifiedBiscuit,
+    from: &BiscuitBytes,
+) -> Result<UnverifiedBiscuit, Box<dyn Error>> {
+    match from {
+        BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => biscuit
+            .append_third_party(&read_stdin_bytes()?)
+            .map_err(|e| e.into()),
+        BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => biscuit
+            .append_third_party_base64(&read_stdin_string("base64-encode third-party block")?)
+            .map_err(|e| e.into()),
+        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => biscuit
+            .append_third_party(&fs::read(&path)?)
+            .map_err(|e| e.into()),
+        BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => biscuit
+            .append_third_party_base64(&fs::read_to_string(&path)?.trim())
+            .map_err(|e| e.into()),
+        BiscuitBytes::Base64String(str) => biscuit
+            .append_third_party_base64(&str)
+            .map_err(|e| e.into()),
     }
 }
 

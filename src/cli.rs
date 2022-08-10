@@ -22,6 +22,12 @@ pub enum SubCommand {
     Generate(Generate),
     #[clap()]
     Attenuate(Attenuate),
+    #[clap()]
+    GenerateRequest(GenerateRequest),
+    #[clap()]
+    GenerateThirdPartyBlock(GenerateThirdPartyBlock),
+    #[clap()]
+    AppendThirdPartyBlock(AppendThirdPartyBlock),
 }
 
 /// Create and manipulate key pairs
@@ -107,6 +113,34 @@ pub struct Attenuate {
     pub add_ttl: Option<Duration>,
 }
 
+/// Attenuate an existing biscuit by adding a new third-party block
+#[derive(Parser)]
+pub struct AppendThirdPartyBlock {
+    /// Read the biscuit from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub biscuit_file: PathBuf,
+    /// Read the biscuit raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
+    /// Output the biscuit raw bytes directly, with no base64 encoding
+    #[clap(long)]
+    pub raw_output: bool,
+    /// The third-party block to append to the token.
+    #[clap(long)]
+    pub block_contents: Option<String>,
+    /// The third-party block to append to the token
+    #[clap(
+        long,
+        parse(from_os_str),
+        conflicts_with("block-contents"),
+        required_unless_present("block-contents")
+    )]
+    pub block_contents_file: Option<PathBuf>,
+    /// Read the third-party block contents raw bytes directly, with no base64 parsing
+    #[clap(long, requires("block-contents-file"))]
+    pub raw_block_contents: bool,
+}
+
 /// Inspect a biscuit and optionally check its public key
 #[derive(Parser)]
 pub struct Inspect {
@@ -149,4 +183,58 @@ pub struct Inspect {
     /// Include the current time in the verifier facts
     #[clap(long)]
     pub include_time: bool,
+}
+
+/// Generate a third-party block request from an existing biscuit
+#[derive(Parser)]
+pub struct GenerateRequest {
+    /// Read the biscuit from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub biscuit_file: PathBuf,
+    /// Read the biscuit raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
+    /// Output the request raw bytes directly, with no base64 encoding
+    #[clap(long)]
+    pub raw_output: bool,
+}
+
+/// Generate a third-party block from a request
+#[derive(Parser)]
+pub struct GenerateThirdPartyBlock {
+    /// Read the request from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub request_file: PathBuf,
+    /// Read the request raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
+    /// The private key used to sign the third-party block
+    #[clap(long, required_unless_present("private-key-file"))]
+    pub private_key: Option<String>,
+    /// The private key used to sign the third-party block
+    #[clap(
+        long,
+        parse(from_os_str),
+        required_unless_present("private-key"),
+        conflicts_with = "private-key"
+    )]
+    pub private_key_file: Option<PathBuf>,
+    /// Read the private key raw bytes directly (only available when reading the private key from a file)
+    #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
+    pub raw_private_key: bool,
+    /// Output the block raw bytes directly, with no base64 encoding
+    #[clap(long)]
+    pub raw_output: bool,
+    /// The block to generate. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+    #[clap(long)]
+    pub block: Option<String>,
+    /// The block to generate. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+    #[clap(long, parse(from_os_str), conflicts_with = "block")]
+    pub block_file: Option<PathBuf>,
+    /// The optional context string attached to the new block
+    #[clap(long)]
+    pub context: Option<String>,
+    /// Add a TTL check to the generated block
+    #[clap(long, parse(try_from_str = parse_duration))]
+    pub add_ttl: Option<Duration>,
 }
