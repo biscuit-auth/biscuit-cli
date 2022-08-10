@@ -60,11 +60,20 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
+    let external_keys = biscuit.external_public_keys();
     for i in 0..biscuit.block_count() {
         if i == 0 {
             println!("Authority block:");
         } else {
-            println!("Block n°{}:", i);
+            if let Some(Some(epk)) = external_keys.get(i) {
+                println!(
+                    "Block n°{}, (third party, signed by {}):",
+                    i,
+                    hex::encode(&epk)
+                );
+            } else {
+                println!("Block n°{}:", i);
+            }
         }
 
         println!("== Datalog ==");
