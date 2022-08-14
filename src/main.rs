@@ -1,14 +1,13 @@
+use anyhow::Result;
 use biscuit_auth::{
     builder::BlockBuilder,
     Biscuit, {KeyPair, PrivateKey},
 };
 use chrono::Utc;
 use clap::Parser;
-use std::error::Error;
 use std::io::Write;
 use std::io::{self};
 use std::path::PathBuf;
-use std::process;
 
 mod cli;
 mod errors;
@@ -19,7 +18,7 @@ use cli::*;
 use input::*;
 use inspect::*;
 
-fn handle_command(cmd: &SubCommand) -> Result<(), Box<dyn Error>> {
+fn handle_command(cmd: &SubCommand) -> Result<()> {
     match cmd {
         SubCommand::KeyPairCmd(key_pair_cmd) => handle_keypair(key_pair_cmd),
         SubCommand::Inspect(inspect) => handle_inspect(inspect),
@@ -35,7 +34,7 @@ fn handle_command(cmd: &SubCommand) -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<(), Box<dyn Error>> {
+fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     let stdin_path = PathBuf::from("-");
     let private_key_from = &match (
         &key_pair_cmd.from_private_key,
@@ -108,14 +107,14 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
+fn handle_generate(generate: &Generate) -> Result<()> {
     let authority_from = match &generate.authority_file {
         Some(path) if path == &PathBuf::from("-") => DatalogInput::FromStdin,
         Some(path) => DatalogInput::FromFile(path.to_path_buf()),
         None => DatalogInput::FromEditor,
     };
 
-    let private_key: Result<PrivateKey, Box<dyn Error>> = read_private_key_from(&match (
+    let private_key: Result<PrivateKey> = read_private_key_from(&match (
         &generate.private_key,
         &generate.private_key_file,
         &generate.raw_private_key,
@@ -151,7 +150,7 @@ fn handle_generate(generate: &Generate) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
+fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
     let biscuit_format = if attenuate.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -197,7 +196,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn handle_generate_request(generate_request: &GenerateRequest) -> Result<(), Box<dyn Error>> {
+fn handle_generate_request(generate_request: &GenerateRequest) -> Result<()> {
     let biscuit_format = if generate_request.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -225,7 +224,7 @@ fn handle_generate_request(generate_request: &GenerateRequest) -> Result<(), Box
 
 fn handle_generate_third_party_block(
     generate_third_party_block: &GenerateThirdPartyBlock,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let block_format = if generate_third_party_block.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -254,7 +253,7 @@ fn handle_generate_third_party_block(
 
     ensure_no_input_conflict(&block_from, &request_from)?;
 
-    let private_key: Result<PrivateKey, Box<dyn Error>> = read_private_key_from(&match (
+    let private_key: Result<PrivateKey> = read_private_key_from(&match (
         &generate_third_party_block.private_key,
         &generate_third_party_block.private_key_file,
         &generate_third_party_block.raw_private_key,
@@ -291,9 +290,7 @@ fn handle_generate_third_party_block(
     Ok(())
 }
 
-fn handle_append_third_party_block(
-    append_third_party_block: &AppendThirdPartyBlock,
-) -> Result<(), Box<dyn Error>> {
+fn handle_append_third_party_block(append_third_party_block: &AppendThirdPartyBlock) -> Result<()> {
     let biscuit_format = if append_third_party_block.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -343,13 +340,7 @@ fn handle_append_third_party_block(
     Ok(())
 }
 
-pub fn main() {
+pub fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
-    match handle_command(&opts.subcmd) {
-        Ok(()) => process::exit(0),
-        Err(e) => {
-            eprintln!("[Error] {}", &e);
-            process::exit(1);
-        }
-    }
+    handle_command(&opts.subcmd)
 }
