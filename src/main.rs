@@ -1,4 +1,5 @@
 use biscuit_auth::{
+    builder::BlockBuilder,
     Biscuit, {KeyPair, PrivateKey},
 };
 use chrono::Utc;
@@ -174,7 +175,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<(), Box<dyn Error>> {
     ensure_no_input_conflict(&block_from, &biscuit_from)?;
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
-    let mut block_builder = biscuit.create_block();
+    let mut block_builder = BlockBuilder::new();
 
     read_block_from(&block_from, &attenuate.context, &mut block_builder)?;
 
