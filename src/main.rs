@@ -21,16 +21,16 @@ use inspect::*;
 
 fn handle_command(cmd: &SubCommand) -> Result<(), Box<dyn Error>> {
     match cmd {
-        SubCommand::KeyPairCmd(key_pair_cmd) => handle_keypair(&key_pair_cmd),
-        SubCommand::Inspect(inspect) => handle_inspect(&inspect),
-        SubCommand::Generate(generate) => handle_generate(&generate),
-        SubCommand::Attenuate(attenuate) => handle_attenuate(&attenuate),
-        SubCommand::GenerateRequest(generate_request) => handle_generate_request(&generate_request),
+        SubCommand::KeyPairCmd(key_pair_cmd) => handle_keypair(key_pair_cmd),
+        SubCommand::Inspect(inspect) => handle_inspect(inspect),
+        SubCommand::Generate(generate) => handle_generate(generate),
+        SubCommand::Attenuate(attenuate) => handle_attenuate(attenuate),
+        SubCommand::GenerateRequest(generate_request) => handle_generate_request(generate_request),
         SubCommand::GenerateThirdPartyBlock(generate_third_party_block) => {
-            handle_generate_third_party_block(&generate_third_party_block)
+            handle_generate_third_party_block(generate_third_party_block)
         }
         SubCommand::AppendThirdPartyBlock(append_third_party_block) => {
-            handle_append_third_party_block(&append_third_party_block)
+            handle_append_third_party_block(append_third_party_block)
         }
     }
 }
@@ -61,7 +61,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<(), Box<dyn Error>> {
     };
 
     let private_key: Option<PrivateKey> = if let Some(f) = private_key_from {
-        Some(read_private_key_from(&f)?)
+        Some(read_private_key_from(f)?)
     } else {
         None
     };
