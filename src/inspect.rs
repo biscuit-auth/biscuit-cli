@@ -54,24 +54,28 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
     };
 
     if let Some(vf) = &authorizer_from {
-        ensure_no_input_conflict(&vf, &biscuit_from)?;
+        ensure_no_input_conflict(vf, &biscuit_from)?;
     }
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
 
     let content_revocation_ids = biscuit.revocation_identifiers();
+    let external_keys = biscuit.external_public_keys();
     for i in 0..biscuit.block_count() {
         if i == 0 {
             println!("Authority block:");
+        } else if let Some(Some(epk)) = external_keys.get(i) {
+            println!(
+                "Block n°{}, (third party, signed by {}):",
+                i,
+                hex::encode(&epk)
+            );
         } else {
             println!("Block n°{}:", i);
         }
 
         println!("== Datalog ==");
-        println!(
-            "{}",
-            biscuit.print_block_source(i).unwrap_or_else(String::new)
-        );
+        println!("{}", biscuit.print_block_source(i)?);
 
         println!("== Revocation id ==");
         let content_id = content_revocation_ids
@@ -139,12 +143,12 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
 fn display_logic_error(policies: &[Policy], e: &Logic) {
     match e {
         Logic::Unauthorized { policy, checks } => {
-            display_matched_policy(policies, &policy);
-            display_failed_checks(&checks);
+            display_matched_policy(policies, policy);
+            display_failed_checks(checks);
         }
         Logic::NoMatchingPolicy { checks } => {
             println!("No policy matched");
-            display_failed_checks(&checks);
+            display_failed_checks(checks);
         }
         e => println!("An execution error happened during authorization: {:?}", &e),
     }
@@ -170,7 +174,7 @@ fn display_matched_policy(policies: &[Policy], policy: &MatchedPolicy) {
 }
 
 fn display_failed_checks(checks: &Vec<FailedCheck>) {
-    if checks.len() > 0 {
+    if !checks.is_empty() {
         println!("The following checks failed:");
     }
     for c in checks {
