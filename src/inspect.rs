@@ -1,16 +1,16 @@
+use anyhow::Result;
 use biscuit_auth::{
     builder::Policy,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
 };
 use chrono::offset::Utc;
-use std::error::Error;
 use std::path::PathBuf;
 
 use crate::cli::*;
-use crate::errors::*;
+use crate::errors::CliError::*;
 use crate::input::*;
 
-pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
+pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     let biscuit_format = if inspect.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -130,10 +130,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<(), Box<dyn Error>> {
         println!("🙈 Public key check skipped 🔑");
         println!("🙈 Datalog check skipped 🛡️");
         if authorizer_from.is_some() {
-            return Err(E {
-                msg: "A public key is required when authorizng a biscuit".to_owned(),
-            }
-            .into());
+            Err(MissingPublicKeyForAuthorization)?
         }
     }
 

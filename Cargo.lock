@@ -76,6 +76,7 @@ dependencies = [
 name = "biscuit-cli"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "atty",
  "biscuit-auth",
  "chrono",
@@ -84,6 +85,7 @@ dependencies = [
  "parse_duration",
  "shell-words",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
