@@ -128,7 +128,12 @@ fn handle_generate(generate: &Generate) -> Result<()> {
 
     let root = KeyPair::from(private_key?);
     let mut builder = Biscuit::builder();
-    read_authority_from(&authority_from, &generate.context, &mut builder)?;
+    read_authority_from(
+        &authority_from,
+        &generate.param,
+        &generate.context,
+        &mut builder,
+    )?;
 
     if let Some(duration) = generate.add_ttl {
         let expiration = Utc::now() + duration;
@@ -176,7 +181,12 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
     let biscuit = read_biscuit_from(&biscuit_from)?;
     let mut block_builder = BlockBuilder::new();
 
-    read_block_from(&block_from, &attenuate.context, &mut block_builder)?;
+    read_block_from(
+        &block_from,
+        &attenuate.param,
+        &attenuate.context,
+        &mut block_builder,
+    )?;
 
     if let Some(duration) = attenuate.add_ttl {
         let expiration = Utc::now() + duration;
@@ -269,6 +279,7 @@ fn handle_generate_third_party_block(
 
     read_block_from(
         &block_from,
+        &generate_third_party_block.param,
         &generate_third_party_block.context,
         &mut request,
     )?;

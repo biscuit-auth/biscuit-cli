@@ -2,17 +2,18 @@ use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder},
-    parser::{parse_block_source, parse_source},
     Authorizer, Request, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
 use chrono::Duration;
 use parse_duration as duration_parser;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::cli::Param;
 use crate::errors::CliError::*;
 
 pub enum BiscuitFormat {
@@ -129,6 +130,7 @@ pub fn get_editor_command() -> Result<Command> {
 
 pub fn read_authority_from(
     from: &DatalogInput,
+    all_params: &[Param],
     context: &Option<String>,
     builder: &mut BiscuitBuilder,
 ) -> Result<()> {
@@ -138,20 +140,23 @@ pub fn read_authority_from(
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    // todo use display instead of debug for parse errors
-    let result = parse_block_source(&string)
-        .map_err(|e| ParseError("datalog input".to_string(), format!("{:?}", e)))?;
 
-    for (fact_str, _) in result.facts {
-        builder.add_fact(fact_str)?;
-    }
-    for (rule_str, _) in result.rules {
-        builder.add_rule(rule_str)?;
-    }
-    for (check_str, _) in result.checks {
-        builder.add_check(check_str)?;
+    let mut params = HashMap::new();
+    let mut scope_params = HashMap::new();
+    for p in all_params {
+        match p {
+            Param::Term(name, t) => {
+                params.insert(name.clone(), t.clone());
+            }
+            Param::PublicKey(name, pk) => {
+                scope_params.insert(name.clone(), *pk);
+            }
+        }
     }
 
+    builder
+        .add_code_with_params(&string, params, scope_params)
+        .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
     if let Some(ctx) = context {
         builder.set_context(ctx.to_owned());
     }
@@ -161,6 +166,7 @@ pub fn read_authority_from(
 
 pub fn read_block_from(
     from: &DatalogInput,
+    all_params: &[Param],
     context: &Option<String>,
     builder: &mut BlockBuilder,
 ) -> Result<()> {
@@ -170,19 +176,22 @@ pub fn read_block_from(
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    // todo use something better than debug
-    let result = parse_block_source(&string)
-        .map_err(|e| ParseError("datalog input".to_string(), format!("{:?}", &e)))?;
 
-    for (fact_str, _) in result.facts {
-        builder.add_fact(fact_str)?;
+    let mut params = HashMap::new();
+    let mut scope_params = HashMap::new();
+    for p in all_params {
+        match p {
+            Param::Term(name, t) => {
+                params.insert(name.clone(), t.clone());
+            }
+            Param::PublicKey(name, pk) => {
+                scope_params.insert(name.clone(), *pk);
+            }
+        }
     }
-    for (rule_str, _) in result.rules {
-        builder.add_rule(rule_str)?;
-    }
-    for (check_str, _) in result.checks {
-        builder.add_check(check_str)?;
-    }
+    builder
+        .add_code_with_params(&string, params, scope_params)
+        .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
     if let Some(ctx) = context {
         builder.set_context(ctx.to_owned());
@@ -191,29 +200,33 @@ pub fn read_block_from(
     Ok(())
 }
 
-pub fn read_authorizer_from(from: &DatalogInput, authorizer: &mut Authorizer) -> Result<()> {
+pub fn read_authorizer_from(
+    from: &DatalogInput,
+    all_params: &[Param],
+    authorizer: &mut Authorizer,
+) -> Result<()> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
         DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
-    let result = parse_source(&string)
-        .map_err(|e| ParseError("datalog input".to_string(), format!("{:?}", &e)))?;
 
-    for (fact_str, _) in result.facts {
-        authorizer.add_fact(fact_str)?;
+    let mut params = HashMap::new();
+    let mut scope_params = HashMap::new();
+    for p in all_params {
+        match p {
+            Param::Term(name, t) => {
+                params.insert(name.clone(), t.clone());
+            }
+            Param::PublicKey(name, pk) => {
+                scope_params.insert(name.clone(), *pk);
+            }
+        }
     }
-    for (rule_str, _) in result.rules {
-        authorizer.add_rule(rule_str)?;
-    }
-    for (check_str, _) in result.checks {
-        authorizer.add_check(check_str)?;
-    }
-
-    for (policy_str, _) in result.policies {
-        authorizer.add_policy(policy_str)?;
-    }
+    authorizer
+        .add_code_with_params(&string, params, scope_params)
+        .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
     Ok(())
 }
