@@ -1,8 +1,53 @@
+use biscuit_auth::{builder::Term, PublicKey};
 use chrono::Duration;
 use clap::Parser;
+use std::convert::TryInto;
 use std::path::PathBuf;
 
 use crate::input::*;
+
+#[derive(Debug, Clone)]
+pub enum Param {
+    Term(String, Term),
+    PublicKey(String, PublicKey),
+}
+
+fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
+    use std::io::{Error, ErrorKind};
+    let (name, value) = (kv.split_once('=').ok_or_else(|| Error::new(
+        ErrorKind::Other,
+        "Params must be `key=value` or `key=value::type` where type is pubkey, integer, date or bytes",
+    )))?;
+    if let Some(encoded) = value.strip_suffix("::pubkey") {
+        let bytes =
+            hex::decode(encoded).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
+        let pubkey = PublicKey::from_bytes(&bytes?)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::PublicKey(name.to_string(), pubkey))
+    } else if let Some(int_str) = value.strip_suffix("::integer") {
+        let int = int_str
+            .parse()
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Integer(int)))
+    } else if let Some(date_str) = value.strip_suffix("::date") {
+        let date =
+            time::OffsetDateTime::parse(date_str, &time::format_description::well_known::Rfc3339)
+                .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        let timestamp = date
+            .unix_timestamp()
+            .try_into()
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Date(timestamp)))
+    } else if let Some(bytes_str) = value.strip_suffix("::bytes") {
+        let bytes =
+            hex::decode(bytes_str).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
+    } else if let Some(value) = value.strip_suffix("::string") {
+        Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
+    } else {
+        Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
+    }
+}
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
@@ -57,11 +102,18 @@ pub struct KeyPairCmd {
 }
 
 /// Generate a biscuit from a private key and an authority block
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct Generate {
     /// Read the authority block from the given file (or use `-` to read from stdin). If omitted, an interactive $EDITOR will be opened.
     #[clap(parse(from_os_str))]
     pub authority_file: Option<PathBuf>,
+    /// Provide a value for a datalog parameter
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key=value::type"
+    )]
+    pub param: Vec<Param>,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw: bool,
@@ -111,6 +163,13 @@ pub struct Attenuate {
     /// Add a TTL check to the generated block
     #[clap(long, parse(try_from_str = parse_duration))]
     pub add_ttl: Option<Duration>,
+    /// Provide a value for a datalog parameter
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key=value::type"
+    )]
+    pub param: Vec<Param>,
 }
 
 /// Attenuate an existing biscuit by adding a new third-party block
@@ -183,6 +242,16 @@ pub struct Inspect {
     /// Include the current time in the verifier facts
     #[clap(long)]
     pub include_time: bool,
+    /// Provide a value for a datalog parameter
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key=value::type",
+        requires("verify-with"),
+        requires("verify-interactive"),
+        requires("verify-with-file")
+    )]
+    pub param: Vec<Param>,
 }
 
 /// Generate a third-party block request from an existing biscuit
@@ -237,4 +306,11 @@ pub struct GenerateThirdPartyBlock {
     /// Add a TTL check to the generated block
     #[clap(long, parse(try_from_str = parse_duration))]
     pub add_ttl: Option<Duration>,
+    /// Provide a value for a datalog parameter
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key=value::type",
+    )]
+    pub param: Vec<Param>,
 }

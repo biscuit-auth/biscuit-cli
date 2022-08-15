@@ -97,7 +97,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
 
         if let Some(auth_from) = authorizer_from {
             let mut authorizer_builder = biscuit.authorizer()?;
-            read_authorizer_from(&auth_from, &mut authorizer_builder)?;
+            read_authorizer_from(&auth_from, &inspect.param, &mut authorizer_builder)?;
             if inspect.include_time {
                 let now = Utc::now().to_rfc3339();
                 let time_fact = format!("time({})", now);
