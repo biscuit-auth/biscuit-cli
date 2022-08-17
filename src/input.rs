@@ -2,7 +2,7 @@ use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder},
-    Authorizer, Request, UnverifiedBiscuit, {PrivateKey, PublicKey},
+    Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
 use chrono::Duration;
 use parse_duration as duration_parser;
@@ -294,23 +294,27 @@ pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit> {
     Ok(b)
 }
 
-pub fn read_request_from(from: &BiscuitBytes) -> Result<Request> {
+pub fn read_request_from(from: &BiscuitBytes) -> Result<ThirdPartyRequest> {
     let req = match from {
         BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => {
-            Request::deserialize(&read_stdin_bytes()?)?
+            ThirdPartyRequest::deserialize(&read_stdin_bytes()?)?
         }
-        BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => Request::deserialize_base64(
-            &read_stdin_string("base64-encoded third-party block request")?,
-        )?,
-        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
-            Request::deserialize(&fs::read(&path).map_err(|_| FileNotFound(path.clone()))?)?
+        BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
+            ThirdPartyRequest::deserialize_base64(&read_stdin_string(
+                "base64-encoded third-party block request",
+            )?)?
         }
-        BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => Request::deserialize_base64(
-            fs::read_to_string(&path)
-                .map_err(|_| FileNotFound(path.clone()))?
-                .trim(),
+        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => ThirdPartyRequest::deserialize(
+            &fs::read(&path).map_err(|_| FileNotFound(path.clone()))?,
         )?,
-        BiscuitBytes::Base64String(str) => Request::deserialize_base64(&str)?,
+        BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
+            ThirdPartyRequest::deserialize_base64(
+                fs::read_to_string(&path)
+                    .map_err(|_| FileNotFound(path.clone()))?
+                    .trim(),
+            )?
+        }
+        BiscuitBytes::Base64String(str) => ThirdPartyRequest::deserialize_base64(&str)?,
     };
     Ok(req)
 }

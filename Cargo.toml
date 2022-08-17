@@ -17,7 +17,6 @@ path = "src/main.rs"
 
 [dependencies]
 atty = "0.2.14"
-#biscuit-auth = { path = "../biscuit-rust/biscuit-auth" }
 biscuit-auth = { git = "https://github.com/biscuit-auth/biscuit-rust", branch = "master" }
 clap = { version = "^3.0", features = ["color", "derive"] }
 chrono = "^0.4"

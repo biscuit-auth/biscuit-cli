@@ -1,6 +1,7 @@
 use anyhow::Result;
 use biscuit_auth::{
     builder::BlockBuilder,
+    builder_ext::BuilderExt,
     Biscuit, {KeyPair, PrivateKey},
 };
 use chrono::Utc;
@@ -137,10 +138,7 @@ fn handle_generate(generate: &Generate) -> Result<()> {
 
     if let Some(duration) = generate.add_ttl {
         let expiration = Utc::now() + duration;
-        builder.add_check::<&str>(&format!(
-            "check if time($t), $t < {}",
-            &expiration.to_rfc3339()
-        ))?;
+        builder.check_expiration_date(expiration.into());
     }
     let biscuit = builder.build(&root).expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
@@ -190,10 +188,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
 
     if let Some(duration) = attenuate.add_ttl {
         let expiration = Utc::now() + duration;
-        block_builder.add_check::<&str>(&format!(
-            "check if time($t), $t < {}",
-            &expiration.to_rfc3339()
-        ))?;
+        block_builder.check_expiration_date(expiration.into());
     }
 
     let new_biscuit = biscuit.append(block_builder)?;
@@ -226,7 +221,7 @@ fn handle_generate_request(generate_request: &GenerateRequest) -> Result<()> {
     let encoded = if generate_request.raw_output {
         request.serialize()?
     } else {
-        request.serialize_base64()?
+        request.serialize_base64()?.into_bytes()
     };
     let _ = io::stdout().write_all(&encoded);
     Ok(())
@@ -275,27 +270,27 @@ fn handle_generate_third_party_block(
         _ => unreachable!(),
     });
 
-    let mut request = read_request_from(&request_from)?;
+    let request = read_request_from(&request_from)?;
 
+    let mut builder = BlockBuilder::new();
     read_block_from(
         &block_from,
         &generate_third_party_block.param,
         &generate_third_party_block.context,
-        &mut request,
+        &mut builder,
     )?;
 
     if let Some(duration) = generate_third_party_block.add_ttl {
         let expiration = Utc::now() + duration;
-        request.add_check::<&str>(&format!(
-            "check if time($t), $t < {}",
-            &expiration.to_rfc3339()
-        ))?;
+        builder.check_expiration_date(expiration.into());
     }
 
+    let block = request.create_block(private_key?, builder)?;
+
     let encoded = if generate_third_party_block.raw_output {
-        request.create_response(private_key?)?
+        block.serialize()?
     } else {
-        request.create_response_base64(private_key?)?
+        block.serialize_base64()?.into_bytes()
     };
     let _ = io::stdout().write_all(&encoded);
     Ok(())
