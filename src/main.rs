@@ -67,11 +67,11 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     };
 
     let key_pair = if let Some(private) = private_key {
-        KeyPair::from(private)
+        KeyPair::from(&private)
     } else {
         KeyPair::new()
     };
-
+    
     match (
         &key_pair_cmd.only_private_key,
         &key_pair_cmd.raw_private_key_output,
@@ -127,7 +127,7 @@ fn handle_generate(generate: &Generate) -> Result<()> {
         _ => unreachable!(),
     });
 
-    let root = KeyPair::from(private_key?);
+    let root = KeyPair::from(&private_key?);
     let mut builder = Biscuit::builder();
     read_authority_from(
         &authority_from,
@@ -285,7 +285,7 @@ fn handle_generate_third_party_block(
         builder.check_expiration_date(expiration.into());
     }
 
-    let block = request.create_block(private_key?, builder)?;
+    let block = request.create_block(&private_key?, builder)?;
 
     let encoded = if generate_third_party_block.raw_output {
         block.serialize()?
