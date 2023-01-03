@@ -16,8 +16,9 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+#biscuit-auth = { path = "../biscuit-rust/biscuit-auth" }
 atty = "0.2.14"
-biscuit-auth = { git = "https://github.com/biscuit-auth/biscuit-rust", branch = "master" }
+biscuit-auth = { git = "https://github.com/biscuit-auth/biscuit-rust", branch = "main" }
 clap = { version = "^3.0", features = ["color", "derive"] }
 chrono = "^0.4"
 hex = "0.4.3"
