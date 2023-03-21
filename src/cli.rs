@@ -229,6 +229,7 @@ pub struct Inspect {
     /// Authorize the biscuit with the provided authorizer.
     #[clap(
         long,
+        parse(from_os_str),
         alias("verify-with-file"),
         conflicts_with("authorize-with"),
         conflicts_with("authorize-interactive")
