@@ -64,6 +64,8 @@ pub enum SubCommand {
     #[clap()]
     Inspect(Inspect),
     #[clap()]
+    InspectSnapshot(InspectSnapshot),
+    #[clap()]
     Generate(Generate),
     #[clap()]
     Attenuate(Attenuate),
@@ -289,6 +291,17 @@ pub struct Inspect {
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
+}
+
+/// Inspect a snapshot
+#[derive(Parser)]
+pub struct InspectSnapshot {
+    /// Read the snapshot from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub snapshot_file: PathBuf,
+    /// Read the snapshot raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
 }
 
 /// Generate a third-party block request from an existing biscuit

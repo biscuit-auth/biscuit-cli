@@ -160,6 +160,26 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     Ok(())
 }
 
+pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()> {
+    let snapshot_format = if inspect_snapshot.raw_input {
+        BiscuitFormat::RawBiscuit
+    } else {
+        BiscuitFormat::Base64Biscuit
+    };
+
+    let snapshot_from = if inspect_snapshot.snapshot_file == PathBuf::from("-") {
+        BiscuitBytes::FromStdin(snapshot_format)
+    } else {
+        BiscuitBytes::FromFile(snapshot_format, inspect_snapshot.snapshot_file.clone())
+    };
+
+    let authorizer = read_snapshot_from(&snapshot_from)?;
+
+    println!("{}", authorizer.dump_code());
+
+    Ok(())
+}
+
 fn display_logic_error(policies: &[Policy], e: &Logic) {
     match e {
         Logic::Unauthorized { policy, checks } => {

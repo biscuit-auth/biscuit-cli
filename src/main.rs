@@ -23,6 +23,7 @@ fn handle_command(cmd: &SubCommand) -> Result<()> {
     match cmd {
         SubCommand::KeyPairCmd(key_pair_cmd) => handle_keypair(key_pair_cmd),
         SubCommand::Inspect(inspect) => handle_inspect(inspect),
+        SubCommand::InspectSnapshot(inspect_snapshot) => handle_inspect_snapshot(inspect_snapshot),
         SubCommand::Generate(generate) => handle_generate(generate),
         SubCommand::Attenuate(attenuate) => handle_attenuate(attenuate),
         SubCommand::GenerateRequest(generate_request) => handle_generate_request(generate_request),
