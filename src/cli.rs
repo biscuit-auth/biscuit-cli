@@ -283,6 +283,12 @@ pub struct Inspect {
         requires("authorize-with-file")
     )]
     pub param: Vec<Param>,
+    /// Save an authorizer snapshot to a file
+    #[clap(long, parse(from_os_str))]
+    pub dump_snapshot_to: Option<PathBuf>,
+    /// Output the snapshot raw bytes directly, with no base64 encoding
+    #[clap(long, requires("dump-snapshot-to"))]
+    pub dump_raw_snapshot: bool,
 }
 
 /// Generate a third-party block request from an existing biscuit
