@@ -239,6 +239,33 @@ pub struct Inspect {
         conflicts_with("verify-interactive")
     )]
     pub verify_with: Option<String>,
+    /// Configure the maximum amount of facts that can be generated
+    /// before aborting evaluation
+    #[clap(
+        long,
+        requires("verify-with"),
+        requires("verify-interactive"),
+        requires("verify-with-file")
+    )]
+    pub max_facts: Option<u64>,
+    /// Configure the maximum amount of iterations before aborting
+    /// evaluation
+    #[clap(
+        long,
+        requires("verify-with"),
+        requires("verify-interactive"),
+        requires("verify-with-file")
+    )]
+    pub max_iterations: Option<u64>,
+    #[clap(
+        long,
+        requires("verify-with"),
+        requires("verify-interactive"),
+        requires("verify-with-file"),
+        parse(try_from_str = parse_duration)
+    )]
+    /// Configure the maximum evaluation duration before aborting
+    pub max_time: Option<Duration>,
     /// Include the current time in the verifier facts
     #[clap(long)]
     pub include_time: bool,

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use biscuit_auth::{
     builder::Policy,
+    datalog::RunLimits,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
 };
 use chrono::offset::Utc;
@@ -104,7 +105,17 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                 authorizer_builder.add_fact(time_fact.as_ref())?;
             }
             let (_, _, _, policies) = authorizer_builder.dump();
-            let authorizer_result = authorizer_builder.authorize();
+            let authorizer_result = authorizer_builder.authorize_with_limits(RunLimits {
+                max_facts: inspect
+                    .max_facts
+                    .unwrap_or_else(|| RunLimits::default().max_facts),
+                max_iterations: inspect
+                    .max_iterations
+                    .unwrap_or_else(|| RunLimits::default().max_iterations),
+                max_time: inspect
+                    .max_time
+                    .map_or_else(|| RunLimits::default().max_time, |d| d.to_std().unwrap()),
+            });
             match authorizer_result {
                 Ok(i) => {
                     println!("✅ Authorizer check succeeded 🛡️");
