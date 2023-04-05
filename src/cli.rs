@@ -218,50 +218,53 @@ pub struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     pub raw_public_key: bool,
-    /// Open $EDITOR to provide a authorizer.
+    /// Open $EDITOR to provide an authorizer.
     #[clap(
         long,
-        conflicts_with("verify-with"),
-        conflicts_with("verify-with-file")
+        alias("verify-interactive"),
+        conflicts_with("authorize-with"),
+        conflicts_with("authorize-with-file")
     )]
-    pub verify_interactive: bool,
-    /// Verify the biscuit with the provided authorizer.
+    pub authorize_interactive: bool,
+    /// Authorize the biscuit with the provided authorizer.
     #[clap(
         long,
-        conflicts_with("verify-with"),
-        conflicts_with("verify-interactive")
+        alias("verify-with-file"),
+        conflicts_with("authorize-with"),
+        conflicts_with("authorize-interactive")
     )]
-    pub verify_with_file: Option<PathBuf>,
-    /// Verify the biscuit with the provided authorizer
+    pub authorize_with_file: Option<PathBuf>,
+    /// Authorize the biscuit with the provided authorizer
     #[clap(
         long,
-        conflicts_with("verify-with-file"),
-        conflicts_with("verify-interactive")
+        alias("verify-with"),
+        conflicts_with("authorize-with-file"),
+        conflicts_with("authorize-interactive")
     )]
-    pub verify_with: Option<String>,
+    pub authorize_with: Option<String>,
     /// Configure the maximum amount of facts that can be generated
     /// before aborting evaluation
     #[clap(
         long,
-        requires("verify-with"),
-        requires("verify-interactive"),
-        requires("verify-with-file")
+        requires("authorize-with"),
+        requires("authorize-interactive"),
+        requires("authorize-with-file")
     )]
     pub max_facts: Option<u64>,
     /// Configure the maximum amount of iterations before aborting
     /// evaluation
     #[clap(
         long,
-        requires("verify-with"),
-        requires("verify-interactive"),
-        requires("verify-with-file")
+        requires("authorize-with"),
+        requires("authorize-interactive"),
+        requires("authorize-with-file")
     )]
     pub max_iterations: Option<u64>,
     #[clap(
         long,
-        requires("verify-with"),
-        requires("verify-interactive"),
-        requires("verify-with-file"),
+        requires("authorize-with"),
+        requires("authorize-interactive"),
+        requires("authorize-with-file"),
         parse(try_from_str = parse_duration)
     )]
     /// Configure the maximum evaluation duration before aborting
@@ -274,9 +277,9 @@ pub struct Inspect {
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
         value_name = "key=value::type",
-        requires("verify-with"),
-        requires("verify-interactive"),
-        requires("verify-with-file")
+        requires("authorize-with"),
+        requires("authorize-interactive"),
+        requires("authorize-with-file")
     )]
     pub param: Vec<Param>,
 }
