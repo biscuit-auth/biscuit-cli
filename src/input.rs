@@ -101,10 +101,10 @@ pub fn read_editor_string() -> Result<String> {
         Err(EditorOutsideTTY)?
     }
 
-    let result = get_editor_command()?.arg(&path).spawn()?.wait()?;
+    let result = get_editor_command()?.arg(path).spawn()?.wait()?;
 
     if result.success() {
-        Ok(fs::read_to_string(&path).map_err(|_| FileNotFound(path.to_path_buf()))?)
+        Ok(fs::read_to_string(path).map_err(|_| FileNotFound(path.to_path_buf()))?)
     } else {
         Err(FailedReadingTempFile)?
     }
@@ -137,7 +137,7 @@ pub fn read_authority_from(
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
-        DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
+        DatalogInput::FromFile(f) => fs::read_to_string(f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
 
@@ -173,7 +173,7 @@ pub fn read_block_from(
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
-        DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
+        DatalogInput::FromFile(f) => fs::read_to_string(f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
 
@@ -208,7 +208,7 @@ pub fn read_authorizer_from(
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
-        DatalogInput::FromFile(f) => fs::read_to_string(&f)?,
+        DatalogInput::FromFile(f) => fs::read_to_string(f)?,
         DatalogInput::DatalogString(str) => str.to_owned(),
     };
 
@@ -238,14 +238,14 @@ pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
             hex::decode(read_stdin_string("hex-encoded private key")?)?
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(&path).map_err(|_| FileNotFound(path.clone()))?
+            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
         }
         KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(&path)
+            fs::read_to_string(path)
                 .map_err(|_| FileNotFound(path.clone()))?
                 .trim(),
         )?,
-        KeyBytes::HexString(str) => hex::decode(&str)?,
+        KeyBytes::HexString(str) => hex::decode(str)?,
     };
     PrivateKey::from_bytes(&bytes)
         .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)).into())
@@ -258,14 +258,14 @@ pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
             hex::decode(read_stdin_string("hex-encoded public key")?)?
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(&path).map_err(|_| FileNotFound(path.clone()))?
+            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
         }
         KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(&path)
+            fs::read_to_string(path)
                 .map_err(|_| FileNotFound(path.clone()))?
                 .trim(),
         )?,
-        KeyBytes::HexString(str) => hex::decode(&str)?,
+        KeyBytes::HexString(str) => hex::decode(str)?,
     };
     PublicKey::from_bytes(&bytes)
         .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)).into())
@@ -274,22 +274,22 @@ pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
 pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit> {
     let b = match from {
         BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => {
-            UnverifiedBiscuit::from(&read_stdin_bytes()?)?
+            UnverifiedBiscuit::from(read_stdin_bytes()?)?
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
-            UnverifiedBiscuit::from_base64(&read_stdin_string("base64-encoded biscuit")?)?
+            UnverifiedBiscuit::from_base64(read_stdin_string("base64-encoded biscuit")?)?
         }
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
-            UnverifiedBiscuit::from(&fs::read(&path).map_err(|_| FileNotFound(path.clone()))?)?
+            UnverifiedBiscuit::from(fs::read(path).map_err(|_| FileNotFound(path.clone()))?)?
         }
         BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
             UnverifiedBiscuit::from_base64(
-                fs::read_to_string(&path)
+                fs::read_to_string(path)
                     .map_err(|_| FileNotFound(path.clone()))?
                     .trim(),
             )?
         }
-        BiscuitBytes::Base64String(str) => UnverifiedBiscuit::from_base64(&str)?,
+        BiscuitBytes::Base64String(str) => UnverifiedBiscuit::from_base64(str)?,
     };
     Ok(b)
 }
@@ -300,21 +300,21 @@ pub fn read_request_from(from: &BiscuitBytes) -> Result<ThirdPartyRequest> {
             ThirdPartyRequest::deserialize(&read_stdin_bytes()?)?
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
-            ThirdPartyRequest::deserialize_base64(&read_stdin_string(
+            ThirdPartyRequest::deserialize_base64(read_stdin_string(
                 "base64-encoded third-party block request",
             )?)?
         }
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => ThirdPartyRequest::deserialize(
-            &fs::read(&path).map_err(|_| FileNotFound(path.clone()))?,
+            &fs::read(path).map_err(|_| FileNotFound(path.clone()))?,
         )?,
         BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
             ThirdPartyRequest::deserialize_base64(
-                fs::read_to_string(&path)
+                fs::read_to_string(path)
                     .map_err(|_| FileNotFound(path.clone()))?
                     .trim(),
             )?
         }
-        BiscuitBytes::Base64String(str) => ThirdPartyRequest::deserialize_base64(&str)?,
+        BiscuitBytes::Base64String(str) => ThirdPartyRequest::deserialize_base64(str)?,
     };
     Ok(req)
 }
@@ -327,17 +327,17 @@ pub fn read_snapshot_from(from: &BiscuitBytes) -> Result<Authorizer> {
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
             Authorizer::from_base64_snapshot(&read_stdin_string("base64-encoded biscuit")?)?
         }
-        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => Authorizer::from_raw_snapshot(
-            &fs::read(&path).map_err(|_| FileNotFound(path.clone()))?,
-        )?,
+        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
+            Authorizer::from_raw_snapshot(&fs::read(path).map_err(|_| FileNotFound(path.clone()))?)?
+        }
         BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
             Authorizer::from_base64_snapshot(
-                fs::read_to_string(&path)
+                fs::read_to_string(path)
                     .map_err(|_| FileNotFound(path.clone()))?
                     .trim(),
             )?
         }
-        BiscuitBytes::Base64String(str) => Authorizer::from_base64_snapshot(&str)?,
+        BiscuitBytes::Base64String(str) => Authorizer::from_base64_snapshot(str)?,
     };
     Ok(b)
 }
@@ -351,17 +351,17 @@ pub fn append_third_party_from(
             biscuit.append_third_party(&read_stdin_bytes()?)?
         }
         BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => biscuit
-            .append_third_party_base64(&read_stdin_string("base64-encode third-party block")?)?,
+            .append_third_party_base64(read_stdin_string("base64-encode third-party block")?)?,
         BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => {
-            biscuit.append_third_party(&fs::read(&path).map_err(|_| FileNotFound(path.clone()))?)?
+            biscuit.append_third_party(&fs::read(path).map_err(|_| FileNotFound(path.clone()))?)?
         }
         BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => biscuit
             .append_third_party_base64(
-                &fs::read_to_string(&path)
+                fs::read_to_string(path)
                     .map_err(|_| FileNotFound(path.clone()))?
                     .trim(),
             )?,
-        BiscuitBytes::Base64String(str) => biscuit.append_third_party_base64(&str)?,
+        BiscuitBytes::Base64String(str) => biscuit.append_third_party_base64(str)?,
     };
     Ok(b)
 }
