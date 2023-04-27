@@ -87,21 +87,21 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
             }
             println!(
                 "Private key: {}",
-                hex::encode(&key_pair.private().to_bytes())
+                hex::encode(key_pair.private().to_bytes())
             );
-            println!("Public key: {}", hex::encode(&key_pair.public().to_bytes()));
+            println!("Public key: {}", hex::encode(key_pair.public().to_bytes()));
         }
         (true, true, false, false) => {
             let _ = io::stdout().write_all(&key_pair.private().to_bytes());
         }
         (true, false, false, false) => {
-            println!("{}", hex::encode(&key_pair.private().to_bytes()));
+            println!("{}", hex::encode(key_pair.private().to_bytes()));
         }
         (false, false, true, true) => {
             let _ = io::stdout().write_all(&key_pair.public().to_bytes());
         }
         (false, false, true, false) => {
-            println!("{}", hex::encode(&key_pair.public().to_bytes()));
+            println!("{}", hex::encode(key_pair.public().to_bytes()));
         }
         // the other combinations are prevented by clap
         _ => unreachable!(),

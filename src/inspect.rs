@@ -70,7 +70,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
             println!(
                 "Block n°{}, (third party, signed by {}):",
                 i,
-                hex::encode(&epk)
+                hex::encode(epk)
             );
         } else {
             println!("Block n°{}:", i);
@@ -82,7 +82,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
         println!("== Revocation id ==");
         let content_id = content_revocation_ids
             .get(i)
-            .map(|bytes| hex::encode(&bytes))
+            .map(hex::encode)
             .unwrap_or_else(|| "n/a".to_owned());
         println!("{}", &content_id);
         println!("\n==========\n");
@@ -140,10 +140,10 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
             if let Some(snapshot_file) = &inspect.dump_snapshot_to {
                 if inspect.dump_raw_snapshot {
                     let bytes = authorizer_builder.to_raw_snapshot()?;
-                    fs::write(snapshot_file, &bytes)?;
+                    fs::write(snapshot_file, bytes)?;
                 } else {
                     let str = authorizer_builder.to_base64_snapshot()?;
-                    fs::write(snapshot_file, &str)?;
+                    fs::write(snapshot_file, str)?;
                 }
             }
         } else {
