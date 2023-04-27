@@ -103,13 +103,13 @@ $ biscuit inspect --public-key-file public-key-file biscuit-file
 > 🙈 Datalog check skipped 🛡️
 ```
 
-A verifier can be provided to check if the biscuit would be allowed in a given context (the command exits with a success code only if the keys match and if the verification suceeded).
+An authorizer can be provided to check if the biscuit would be allowed in a given context (the command exits with a success code only if the keys match and if the authorization suceeded).
 
-If you want to use your text editor to type in the verifier, you can use `--verify-interactive` instead.
+If you want to use your text editor to type in the authorizer, you can use `--authorize-interactive` instead.
 
 ```
 $ biscuit inspect --public-key-file public-key-file \
-                  --verify-with 'allow if right(#authority, "file1");' \
+                  --authorize-with 'allow if right("file1");' \
                   biscuit-file
 > Authority block:
 > == Datalog ==
