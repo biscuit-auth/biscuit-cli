@@ -6,8 +6,8 @@ use biscuit_auth::{
 };
 use chrono::Utc;
 use clap::Parser;
+use std::io;
 use std::io::Write;
-use std::io::{self};
 use std::path::PathBuf;
 
 mod cli;
@@ -33,6 +33,7 @@ fn handle_command(cmd: &SubCommand) -> Result<()> {
         SubCommand::AppendThirdPartyBlock(append_third_party_block) => {
             handle_append_third_party_block(append_third_party_block)
         }
+        SubCommand::Seal(seal) => handle_seal(seal),
     }
 }
 
@@ -72,7 +73,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     } else {
         KeyPair::new()
     };
-    
+
     match (
         &key_pair_cmd.only_private_key,
         &key_pair_cmd.raw_private_key_output,
@@ -339,6 +340,30 @@ fn handle_append_third_party_block(append_third_party_block: &AppendThirdPartyBl
     let new_biscuit = append_third_party_from(&biscuit, &block_from)?;
 
     let encoded = if append_third_party_block.raw_output {
+        new_biscuit.to_vec()?
+    } else {
+        new_biscuit.to_base64()?.into_bytes()
+    };
+    let _ = io::stdout().write_all(&encoded);
+    Ok(())
+}
+
+fn handle_seal(seal: &Seal) -> Result<()> {
+    let biscuit_format = if seal.raw_input {
+        BiscuitFormat::RawBiscuit
+    } else {
+        BiscuitFormat::Base64Biscuit
+    };
+
+    let biscuit_from = if seal.biscuit_file == PathBuf::from("-") {
+        BiscuitBytes::FromStdin(biscuit_format)
+    } else {
+        BiscuitBytes::FromFile(biscuit_format, seal.biscuit_file.clone())
+    };
+
+    let biscuit = read_biscuit_from(&biscuit_from)?;
+    let new_biscuit = biscuit.seal()?;
+    let encoded = if seal.raw_output {
         new_biscuit.to_vec()?
     } else {
         new_biscuit.to_base64()?.into_bytes()

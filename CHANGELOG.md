@@ -7,5 +7,6 @@
 - configurable run limitations (#34)
 - rename `verifier` to `authorizer` (#36)
 - support for generating and inspecting authorizer snapshots (#33)
+- support for sealing biscuits (#26)
 
 

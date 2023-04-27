@@ -75,6 +75,8 @@ pub enum SubCommand {
     GenerateThirdPartyBlock(GenerateThirdPartyBlock),
     #[clap()]
     AppendThirdPartyBlock(AppendThirdPartyBlock),
+    #[clap()]
+    Seal(Seal),
 }
 
 /// Create and manipulate key pairs
@@ -363,4 +365,18 @@ pub struct GenerateThirdPartyBlock {
         value_name = "key=value::type",
     )]
     pub param: Vec<Param>,
+}
+
+/// Seal a token, preventing further attenuation
+#[derive(Parser)]
+pub struct Seal {
+    /// Read the biscuit from the given file (or use `-` to read from stdin)
+    #[clap(parse(from_os_str))]
+    pub biscuit_file: PathBuf,
+    /// Read the biscuit raw bytes directly, with no base64 parsing
+    #[clap(long)]
+    pub raw_input: bool,
+    /// Output the biscuit raw bytes directly, with no base64 encoding
+    #[clap(long)]
+    pub raw_output: bool,
 }
