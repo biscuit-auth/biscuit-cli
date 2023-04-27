@@ -4,7 +4,7 @@ use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder},
     Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
-use chrono::Duration;
+use chrono::{DateTime, Duration, Utc};
 use parse_duration as duration_parser;
 use std::collections::HashMap;
 use std::env;
@@ -366,9 +366,35 @@ pub fn append_third_party_from(
     Ok(b)
 }
 
+#[derive(Debug)]
+pub enum Ttl {
+    Duration(Duration),
+    DateTime(DateTime<Utc>),
+}
+
+impl Ttl {
+    pub fn to_datetime(&self) -> DateTime<Utc> {
+        match self {
+            Self::Duration(d) => Utc::now() + *d,
+            Self::DateTime(d) => *d,
+        }
+    }
+}
+
 pub fn parse_duration(str: &str) -> Result<Duration> {
     let std_duration = duration_parser::parse(str)
         .map_err(|e| ParseError("duration".to_string(), e.to_string()))?;
     let duration = Duration::from_std(std_duration).map_err(|_| InvalidDuration)?;
     Ok(duration)
+}
+
+pub fn parse_date(str: &str) -> Result<DateTime<Utc>> {
+    let r = DateTime::parse_from_rfc3339(str)?;
+    Ok(r.into())
+}
+
+pub fn parse_ttl(str: &str) -> Result<Ttl> {
+    parse_date(str)
+        .map(Ttl::DateTime)
+        .or_else(|_| parse_duration(str).map(Ttl::Duration))
 }
