@@ -138,9 +138,9 @@ pub struct Generate {
     /// The optional context string attached to the authority block
     #[clap(long)]
     pub context: Option<String>,
-    /// Add a TTL check to the generated authority block
-    #[clap(long, parse(try_from_str = parse_duration))]
-    pub add_ttl: Option<Duration>,
+    /// Add a TTL check to the generated authority block (either a RFC3339 datetime or a duration like '1d')
+    #[clap(long, parse(try_from_str = parse_ttl))]
+    pub add_ttl: Option<Ttl>,
 }
 
 /// Attenuate an existing biscuit by adding a new block
@@ -164,9 +164,9 @@ pub struct Attenuate {
     /// The optional context string attached to the new block
     #[clap(long)]
     pub context: Option<String>,
-    /// Add a TTL check to the generated block
-    #[clap(long, parse(try_from_str = parse_duration))]
-    pub add_ttl: Option<Duration>,
+    /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
+    #[clap(long, parse(try_from_str = parse_ttl))]
+    pub add_ttl: Option<Ttl>,
     /// Provide a value for a datalog parameter
     #[clap(
         long,
@@ -355,9 +355,9 @@ pub struct GenerateThirdPartyBlock {
     /// The optional context string attached to the new block
     #[clap(long)]
     pub context: Option<String>,
-    /// Add a TTL check to the generated block
-    #[clap(long, parse(try_from_str = parse_duration))]
-    pub add_ttl: Option<Duration>,
+    /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
+    #[clap(long, parse(try_from_str = parse_ttl))]
+    pub add_ttl: Option<Ttl>,
     /// Provide a value for a datalog parameter
     #[clap(
         long,

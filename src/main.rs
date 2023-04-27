@@ -4,7 +4,6 @@ use biscuit_auth::{
     builder_ext::BuilderExt,
     Biscuit, {KeyPair, PrivateKey},
 };
-use chrono::Utc;
 use clap::Parser;
 use std::io;
 use std::io::Write;
@@ -138,9 +137,8 @@ fn handle_generate(generate: &Generate) -> Result<()> {
         &mut builder,
     )?;
 
-    if let Some(duration) = generate.add_ttl {
-        let expiration = Utc::now() + duration;
-        builder.check_expiration_date(expiration.into());
+    if let Some(ttl) = &generate.add_ttl {
+        builder.check_expiration_date(ttl.to_datetime().into());
     }
     let biscuit = builder.build(&root).expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
@@ -188,9 +186,8 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
         &mut block_builder,
     )?;
 
-    if let Some(duration) = attenuate.add_ttl {
-        let expiration = Utc::now() + duration;
-        block_builder.check_expiration_date(expiration.into());
+    if let Some(ttl) = &attenuate.add_ttl {
+        block_builder.check_expiration_date(ttl.to_datetime().into());
     }
 
     let new_biscuit = biscuit.append(block_builder)?;
@@ -282,9 +279,8 @@ fn handle_generate_third_party_block(
         &mut builder,
     )?;
 
-    if let Some(duration) = generate_third_party_block.add_ttl {
-        let expiration = Utc::now() + duration;
-        builder.check_expiration_date(expiration.into());
+    if let Some(ttl) = &generate_third_party_block.add_ttl {
+        builder.check_expiration_date(ttl.to_datetime().into());
     }
 
     let block = request.create_block(&private_key?, builder)?;

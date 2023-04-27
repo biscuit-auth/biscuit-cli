@@ -8,5 +8,4 @@
 - rename `verifier` to `authorizer` (#36)
 - support for generating and inspecting authorizer snapshots (#33)
 - support for sealing biscuits (#26)
-
-
+- `--add-ttl` now supports timestamps in addition to durations (#39)
