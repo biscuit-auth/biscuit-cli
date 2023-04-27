@@ -42,9 +42,9 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     };
 
     let authorizer_from = match (
-        &inspect.verify_interactive,
-        &inspect.verify_with,
-        &inspect.verify_with_file,
+        &inspect.authorize_interactive,
+        &inspect.authorize_with,
+        &inspect.authorize_with_file,
     ) {
         (false, None, None) => None,
         (true, None, None) => Some(DatalogInput::FromEditor),
