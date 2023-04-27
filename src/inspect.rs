@@ -5,6 +5,7 @@ use biscuit_auth::{
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
 };
 use chrono::offset::Utc;
+use std::fs;
 use std::path::PathBuf;
 
 use crate::cli::*;
@@ -105,6 +106,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                 authorizer_builder.add_fact(time_fact.as_ref())?;
             }
             let (_, _, _, policies) = authorizer_builder.dump();
+
             let authorizer_result = authorizer_builder.authorize_with_limits(RunLimits {
                 max_facts: inspect
                     .max_facts
@@ -116,6 +118,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                     .max_time
                     .map_or_else(|| RunLimits::default().max_time, |d| d.to_std().unwrap()),
             });
+
             match authorizer_result {
                 Ok(i) => {
                     println!("✅ Authorizer check succeeded 🛡️");
@@ -134,6 +137,15 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                     }
                 }
             }
+            if let Some(snapshot_file) = &inspect.dump_snapshot_to {
+                if inspect.dump_raw_snapshot {
+                    let bytes = authorizer_builder.to_raw_snapshot()?;
+                    fs::write(snapshot_file, &bytes)?;
+                } else {
+                    let str = authorizer_builder.to_base64_snapshot()?;
+                    fs::write(snapshot_file, &str)?;
+                }
+            }
         } else {
             println!("🙈 Datalog check skipped 🛡️");
         }
@@ -144,6 +156,26 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
             Err(MissingPublicKeyForAuthorization)?
         }
     }
+
+    Ok(())
+}
+
+pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()> {
+    let snapshot_format = if inspect_snapshot.raw_input {
+        BiscuitFormat::RawBiscuit
+    } else {
+        BiscuitFormat::Base64Biscuit
+    };
+
+    let snapshot_from = if inspect_snapshot.snapshot_file == PathBuf::from("-") {
+        BiscuitBytes::FromStdin(snapshot_format)
+    } else {
+        BiscuitBytes::FromFile(snapshot_format, inspect_snapshot.snapshot_file.clone())
+    };
+
+    let authorizer = read_snapshot_from(&snapshot_from)?;
+
+    println!("{}", authorizer.dump_code());
 
     Ok(())
 }

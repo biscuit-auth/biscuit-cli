@@ -319,6 +319,29 @@ pub fn read_request_from(from: &BiscuitBytes) -> Result<ThirdPartyRequest> {
     Ok(req)
 }
 
+pub fn read_snapshot_from(from: &BiscuitBytes) -> Result<Authorizer> {
+    let b = match from {
+        BiscuitBytes::FromStdin(BiscuitFormat::RawBiscuit) => {
+            Authorizer::from_raw_snapshot(&read_stdin_bytes()?)?
+        }
+        BiscuitBytes::FromStdin(BiscuitFormat::Base64Biscuit) => {
+            Authorizer::from_base64_snapshot(&read_stdin_string("base64-encoded biscuit")?)?
+        }
+        BiscuitBytes::FromFile(BiscuitFormat::RawBiscuit, path) => Authorizer::from_raw_snapshot(
+            &fs::read(&path).map_err(|_| FileNotFound(path.clone()))?,
+        )?,
+        BiscuitBytes::FromFile(BiscuitFormat::Base64Biscuit, path) => {
+            Authorizer::from_base64_snapshot(
+                fs::read_to_string(&path)
+                    .map_err(|_| FileNotFound(path.clone()))?
+                    .trim(),
+            )?
+        }
+        BiscuitBytes::Base64String(str) => Authorizer::from_base64_snapshot(&str)?,
+    };
+    Ok(b)
+}
+
 pub fn append_third_party_from(
     biscuit: &UnverifiedBiscuit,
     from: &BiscuitBytes,
