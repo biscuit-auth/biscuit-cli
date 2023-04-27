@@ -1,4 +1,4 @@
-# `0.3.0` (not released yet)
+# `0.3.0`
 
 - better errors (#25, #28)
 - support for third-party tokens (#27)
