@@ -1,3 +1,7 @@
+# Not released yet
+
+- support for viewing and setting root key ids (#41)
+
 # `0.3.0`
 
 - better errors (#25, #28)

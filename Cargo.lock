@@ -51,9 +51,9 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "biscuit-auth"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47033e72ae01c3bea9385503636ba8cf54083bd52df80eccee088f806d7a0b42"
+checksum = "3d1e91dedc0523e4ff74633d4bdac7251e40e0759f3e85f5f7995ff3c095c281"
 dependencies = [
  "base64",
  "biscuit-parser",
@@ -92,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "biscuit-parser"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a478329b2b23038692ea5b792b99984a5128ea644a35a58f647dc5554c3a5b2"
+checksum = "f6f2fea7264a5bff6f3444b3b05da27ad332427f5267435e2efabaf0476e45bf"
 dependencies = [
  "hex",
  "nom",
