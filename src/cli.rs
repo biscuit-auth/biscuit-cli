@@ -16,7 +16,7 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
     use std::io::{Error, ErrorKind};
     let (name, value) = (kv.split_once('=').ok_or_else(|| Error::new(
         ErrorKind::Other,
-        "Params must be `key=value` or `key=value::type` where type is pubkey, integer, date or bytes",
+        "Params must be `key=value` or `key=value::type` where type is pubkey, integer, date, bytes or bool",
     )))?;
     if let Some(encoded) = value.strip_suffix("::pubkey") {
         let bytes =
@@ -42,6 +42,17 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         let bytes =
             hex::decode(bytes_str).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
+    } else if let Some(bool_str) = value.strip_suffix("::bool") {
+        if bool_str.to_lowercase() == "true" {
+            Ok(Param::Term(name.to_string(), Term::Bool(true)))
+        } else if bool_str.to_lowercase() == "false" {
+            Ok(Param::Term(name.to_string(), Term::Bool(false)))
+        } else {
+            Err(Error::new(
+                ErrorKind::Other,
+                "Boolean params must be either \"true\" or \"false\"",
+            ))
+        }
     } else if let Some(value) = value.strip_suffix("::string") {
         Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
     } else {
