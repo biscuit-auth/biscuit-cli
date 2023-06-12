@@ -125,11 +125,13 @@ pub struct Generate {
     /// Provide a root key id, as a hint for public key selection
     #[clap(long)]
     pub root_key_id: Option<u32>,
-    /// Provide a value for a datalog parameter
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, integer, date, bytes or bool.
+    /// `pubkey` takes a hex-encoded ed25519 key, without the `ed25519/` prefix
+    /// `bytes` takes a hex-encoded byte string, without the `hex:prefix`
     #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key=value::type"
+        value_name = "key=value[::type]"
     )]
     pub param: Vec<Param>,
     /// Output the biscuit raw bytes directly, with no base64 encoding
