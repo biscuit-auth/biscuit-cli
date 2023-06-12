@@ -111,6 +111,9 @@ pub struct Generate {
     /// Read the authority block from the given file (or use `-` to read from stdin). If omitted, an interactive $EDITOR will be opened.
     #[clap(parse(from_os_str))]
     pub authority_file: Option<PathBuf>,
+    /// Provide a root key id, as a hint for public key selection
+    #[clap(long)]
+    pub root_key_id: Option<u32>,
     /// Provide a value for a datalog parameter
     #[clap(
         long,

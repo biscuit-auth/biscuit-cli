@@ -73,7 +73,11 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     let external_keys = biscuit.external_public_keys();
     for i in 0..biscuit.block_count() {
         if i == 0 {
-            println!("Authority block:");
+            if let Some(root_key_id) = biscuit.root_key_id() {
+                println!("Authority block (root key identifier: {}):", &root_key_id);
+            } else {
+                println!("Authority block:");
+            }
         } else if let Some(Some(epk)) = external_keys.get(i) {
             println!(
                 "Block n°{}, (third party, signed by {}):",

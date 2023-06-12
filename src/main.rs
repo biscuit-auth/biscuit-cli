@@ -140,6 +140,9 @@ fn handle_generate(generate: &Generate) -> Result<()> {
     if let Some(ttl) = &generate.add_ttl {
         builder.check_expiration_date(ttl.to_datetime().into());
     }
+    if let Some(root_key_id) = &generate.root_key_id {
+        builder.set_root_key_id(*root_key_id);
+    }
     let biscuit = builder.build(&root).expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
         biscuit.to_vec().expect("Error serializing token")
