@@ -1,6 +1,8 @@
-# Not released yet
+# `0.4.0`
 
 - support for viewing and setting root key ids (#41)
+- improved syntax for datalog parameter injection (#42)
+- biscuit-auth 3.2.0
 
 # `0.3.0`
 
