@@ -24,7 +24,8 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         Some((name, annotation)) => (name, Some(annotation)),
     };
 
-    if annotation == Some("pubkey") {
+    match annotation {
+      Some("pubkey") => {
         let hex_key = value.strip_prefix("ed25519/").ok_or_else(|| Error::new(
         ErrorKind::Other,
         "Unsupported public key type. Only hex-encoded ed25519 public keys are supported. They must start with `ed25519/`.",
@@ -34,12 +35,14 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         let pubkey = PublicKey::from_bytes(&bytes?)
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::PublicKey(name.to_string(), pubkey))
-    } else if annotation == Some("integer") {
+      },
+      Some("integer") => {
         let int = value
             .parse()
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Integer(int)))
-    } else if annotation == Some("date") {
+      },
+      Some("date") => {
         let date =
             time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
                 .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
@@ -48,7 +51,8 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
             .try_into()
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Date(timestamp)))
-    } else if annotation == Some("bytes") {
+      },
+      Some("bytes") => {
         let hex_bytes = value.strip_prefix("hex:").ok_or_else(|| {
             Error::new(
         ErrorKind::Other,
@@ -58,7 +62,8 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         let bytes =
             hex::decode(hex_bytes).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
-    } else if annotation == Some("bool") {
+      },
+      Some("bool") => {
         if value.to_lowercase() == "true" {
             Ok(Param::Term(name.to_string(), Term::Bool(true)))
         } else if value.to_lowercase() == "false" {
@@ -69,13 +74,16 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
                 "Boolean params must be either \"true\" or \"false\".",
             ))
         }
-    } else if annotation == Some("string") || annotation.is_none() {
+      },
+      Some("string") | None => {
         Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
-    } else {
+      },
+      _ => {
         Err(Error::new(
                 ErrorKind::Other,
                 "Unsupported parameter type. Supported types are `pubkey`, `string`, `integer`, `date`, `bytes`, or `bool`.",
             ))
+      }
     }
 }
 
