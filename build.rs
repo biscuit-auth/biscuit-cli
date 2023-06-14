@@ -3,7 +3,6 @@ use std::fs::{self, File};
 use std::path::Path;
 use std::process;
 
-
 fn main() {
     // OUT_DIR is set by Cargo and it's where any additional build artifacts
     // are written.
@@ -25,4 +24,3 @@ fn main() {
         panic!("failed to write {}: {}", stamp_path.display(), err);
     }
 }
-
