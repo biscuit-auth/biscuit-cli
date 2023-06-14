@@ -14,38 +14,76 @@ pub enum Param {
 
 fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
     use std::io::{Error, ErrorKind};
-    let (name, value) = (kv.split_once('=').ok_or_else(|| Error::new(
+    let (binding, value) = (kv.split_once('=').ok_or_else(|| Error::new(
         ErrorKind::Other,
-        "Params must be `key=value` or `key=value::type` where type is pubkey, integer, date or bytes",
+        "Params must be `key=value` or `key:type=value` where type is pubkey, string, integer, date, bytes or bool.",
     )))?;
-    if let Some(encoded) = value.strip_suffix("::pubkey") {
+
+    let (name, annotation) = match binding.rsplit_once(':') {
+        None => (binding, None),
+        Some((name, annotation)) => (name, Some(annotation)),
+    };
+
+    match annotation {
+      Some("pubkey") => {
+        let hex_key = value.strip_prefix("ed25519/").ok_or_else(|| Error::new(
+        ErrorKind::Other,
+        "Unsupported public key type. Only hex-encoded ed25519 public keys are supported. They must start with `ed25519/`.",
+        ))?;
         let bytes =
-            hex::decode(encoded).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
+            hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
         let pubkey = PublicKey::from_bytes(&bytes?)
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::PublicKey(name.to_string(), pubkey))
-    } else if let Some(int_str) = value.strip_suffix("::integer") {
-        let int = int_str
+      },
+      Some("integer") => {
+        let int = value
             .parse()
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Integer(int)))
-    } else if let Some(date_str) = value.strip_suffix("::date") {
+      },
+      Some("date") => {
         let date =
-            time::OffsetDateTime::parse(date_str, &time::format_description::well_known::Rfc3339)
+            time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
                 .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         let timestamp = date
             .unix_timestamp()
             .try_into()
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Date(timestamp)))
-    } else if let Some(bytes_str) = value.strip_suffix("::bytes") {
+      },
+      Some("bytes") => {
+        let hex_bytes = value.strip_prefix("hex:").ok_or_else(|| {
+            Error::new(
+        ErrorKind::Other,
+        "Unusupported byte array literal. Byte arrays must be hex-encoded and start with `hex:`."
+        )
+        })?;
         let bytes =
-            hex::decode(bytes_str).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+            hex::decode(hex_bytes).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
-    } else if let Some(value) = value.strip_suffix("::string") {
+      },
+      Some("bool") => {
+        if value.to_lowercase() == "true" {
+            Ok(Param::Term(name.to_string(), Term::Bool(true)))
+        } else if value.to_lowercase() == "false" {
+            Ok(Param::Term(name.to_string(), Term::Bool(false)))
+        } else {
+            Err(Error::new(
+                ErrorKind::Other,
+                "Boolean params must be either \"true\" or \"false\".",
+            ))
+        }
+      },
+      Some("string") | None => {
         Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
-    } else {
-        Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
+      },
+      _ => {
+        Err(Error::new(
+                ErrorKind::Other,
+                "Unsupported parameter type. Supported types are `pubkey`, `string`, `integer`, `date`, `bytes`, or `bool`.",
+            ))
+      }
     }
 }
 
@@ -114,11 +152,13 @@ pub struct Generate {
     /// Provide a root key id, as a hint for public key selection
     #[clap(long)]
     pub root_key_id: Option<u32>,
-    /// Provide a value for a datalog parameter
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Bytes values must be hex-encoded and start with `hex:`
+    /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key=value::type"
+        value_name = "key[:type]=value"
     )]
     pub param: Vec<Param>,
     /// Output the biscuit raw bytes directly, with no base64 encoding
@@ -170,11 +210,13 @@ pub struct Attenuate {
     /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
-    /// Provide a value for a datalog parameter
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Bytes values must be hex-encoded and start with `hex:`
+    /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key=value::type"
+        value_name = "key[:type]=value"
     )]
     pub param: Vec<Param>,
 }
@@ -280,11 +322,13 @@ pub struct Inspect {
     /// Include the current time in the verifier facts
     #[clap(long)]
     pub include_time: bool,
-    /// Provide a value for a datalog parameter
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Bytes values must be hex-encoded and start with `hex:`
+    /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key=value::type",
+        value_name = "key[:type]=value",
         requires("authorize-with"),
         requires("authorize-interactive"),
         requires("authorize-with-file")
@@ -361,11 +405,13 @@ pub struct GenerateThirdPartyBlock {
     /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
-    /// Provide a value for a datalog parameter
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Bytes values must be hex-encoded and start with `hex:`
+    /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key=value::type",
+        value_name = "key[:type]=value",
     )]
     pub param: Vec<Param>,
 }
