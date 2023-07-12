@@ -3,6 +3,9 @@ setup() {
         TEST_BREW_PREFIX="$(brew --prefix)"
         load "${TEST_BREW_PREFIX}/lib/bats-support/load.bash"
         load "${TEST_BREW_PREFIX}/lib/bats-assert/load.bash"
+    elif [ "${GITHUB_ACTIONS}" == "true" ]; then
+        load "/usr/lib/bats-support/load.bash"
+        load "/usr/lib/bats-assert/load.bash"
     fi
     cargo build
     PATH="./target/debug:${PATH}"
