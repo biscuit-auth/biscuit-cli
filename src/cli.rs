@@ -96,7 +96,7 @@ fn parse_rule(rule: &str) -> Result<Rule, std::io::Error> {
 
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
-#[clap(version = "0.2.0", author = "Clément D. <clement@delafargue.name>")]
+#[clap(version, author)]
 pub struct Opts {
     #[clap(subcommand)]
     pub subcmd: SubCommand,
