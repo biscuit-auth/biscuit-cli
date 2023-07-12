@@ -6,13 +6,13 @@ This package provides a Command Line Interface allowing to manipulate [biscuit](
 
 You can install [biscuit-cli](https://crates.io/crates/biscuit-cli) with Cargo:
 
-```
+```sh
 cargo install biscuit-cli
 ```
 
 ### From source
 
-```
+```sh
 git clone https://github.com/biscuit-auth/biscuit-cli.git
 cd biscuit-cli
 cargo install --path .
@@ -35,7 +35,7 @@ Here are a list of common use-cases:
 
 ### Generate a key pair
 
-```
+```sh
 $ # this will output the keypair, you can then copy/paste the components
 $ biscuit keypair
 > Generating a new random keypair
@@ -48,14 +48,14 @@ $ biscuit keypair --only-private-key > private-key-file
 
 ### Generate a public key from a private key
 
-```
+```sh
 $ biscuit keypair --from-private-key-file private-key-file --only-public-key
 > 2341bc530d8f074100734a41cc05cc82e4e2564eff61b0408f8e37a08f384767
 ```
 
 ### Create a biscuit token
 
-```
+```sh
 $ # this will open your text editor and let you type in the authority block as datalog
 $ biscuit generate --private-key-file private-key-file
 > En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiB-So8adTv5YLBK49I8MrK1JdrYLrFSiFqUkRkVsco9MhpAJzlkr2xHM4JSlFmph7c9UEJPqw_BCscMgkIasAjnXZT5BHpA58M1uo_4KUDbPZSJVtbF93P43X41W7aofjZXAiIiCiCScR0e_rBUa7VjxnKW4PT52ZjC3peMCrWOi1T0jgR0fw==
@@ -69,7 +69,7 @@ $ En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiDg91H1_yfDSMrLnfXLowUZsKJDfrC-1XVSPkbikX
 
 By default, `biscuit` inspect only prints out the biscuit contents (datalog blocks, and revocation ids).
 
-```
+```sh
 $ # this will inspect the token stored in the given file
 $ biscuit inspect biscuit-file
 > Authority block:
@@ -87,7 +87,7 @@ $ biscuit inspect biscuit-file
 
 A public key can be provided to check the biscuit root key (the command exits with a success code only if the keys match)
 
-```
+```sh
 $ # this will make sure the biscuit root key is the same as the one that's provided
 $ biscuit inspect --public-key-file public-key-file biscuit-file
 > Authority block:
@@ -107,7 +107,7 @@ An authorizer can be provided to check if the biscuit would be allowed in a give
 
 If you want to use your text editor to type in the authorizer, you can use `--authorize-interactive` instead.
 
-```
+```sh
 $ biscuit inspect --public-key-file public-key-file \
                   --authorize-with 'allow if right("file1");' \
                   biscuit-file
@@ -127,8 +127,39 @@ $ biscuit inspect --public-key-file public-key-file \
 
 ### Attenuating a biscuit token
 
-```
+```sh
 # this will create a new biscuit token with the provided block appended
 $ biscuit attenuate biscuit-file --block 'check if client_ip_address("127.0.0.1);'
 > En0KEwoFZmlsZTEYAiIICgYIBBICGAcSJAgAEiBrhbrvPUXH9RPOzIwnLVyRWwcK64JQ97kBvz1hLJfjfBpAUmx4_6OBnLcbyt5p1tePgK0SCfIdLDMmhXxmyo_BnGOkKDkptpCuQMqEdFlGMcruRksDZ7eB08wROTQ8E5AFCRqhAQo3CgVxdWVyeQoRY2xpZW50X2lwX2FkZHJlc3MKCTEyNy4wLjAuMRgCMg4KDAoCCAgSBggJEgIYChIkCAASIL6EGw7TZQ-8sRa0RT1U0cW8mjN_GzoW0jwX_67I0zPCGkDL5ho8NPsZwskzJ86e31qR29grjcEQormtv7I3YoQy_I2aoZGNtlviX72FuBT85KlVxJtjOiLxCIOvJj4MVN0KIiIKIM6btYoZ-ONE2gKEJ2raR8Bck7SMBAUf2sK7Z8I7uM_D
 ```
+
+## Contribute
+
+```sh
+git clone https://github.com/biscuit-auth/biscuit-cli.git
+cd biscuit-cli
+cargo run
+cargo test
+# CI ensures consistent formatting
+cargo fmt --check
+# CI ensures that there are no outstanding clippy hints
+cargo clippy
+```
+
+### Integration tests
+
+To run integration tests locally, you will need `bats`. For now, only installation through `brew` and github actions is supported (`bats` needs to load its modules manually, and their installation path depends how they were installed). Feel free to add support for more systems as needed.
+
+```sh
+bats test.bats
+```
+
+<details>
+<summary>Installation with brew</summary>
+```sh
+brew install bats-core
+brew tap kaos/shell
+brew install bats-assert
+brew install bats-file
+```
+</details>
