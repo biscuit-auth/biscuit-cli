@@ -1,19 +1,18 @@
 use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
-    builder::{BiscuitBuilder, BlockBuilder},
+    builder::{BiscuitBuilder, BlockBuilder, Rule, Term},
     Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
 };
 use chrono::{DateTime, Duration, Utc};
 use parse_duration as duration_parser;
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::Command;
+use std::{collections::HashMap, convert::TryInto};
 
-use crate::cli::Param;
 use crate::errors::CliError::*;
 
 pub enum BiscuitFormat {
@@ -397,4 +396,91 @@ pub fn parse_ttl(str: &str) -> Result<Ttl> {
     parse_date(str)
         .map(Ttl::DateTime)
         .or_else(|_| parse_duration(str).map(Ttl::Duration))
+}
+
+#[derive(Debug, Clone)]
+pub enum Param {
+    Term(String, Term),
+    PublicKey(String, PublicKey),
+}
+
+pub fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
+    use std::io::{Error, ErrorKind};
+    let (binding, value) = (kv.split_once('=').ok_or_else(|| Error::new(
+        ErrorKind::Other,
+        "Params must be `key=value` or `key:type=value` where type is pubkey, string, integer, date, bytes or bool.",
+    )))?;
+
+    let (name, annotation) = match binding.rsplit_once(':') {
+        None => (binding, None),
+        Some((name, annotation)) => (name, Some(annotation)),
+    };
+
+    match annotation {
+      Some("pubkey") => {
+        let hex_key = value.strip_prefix("ed25519/").ok_or_else(|| Error::new(
+        ErrorKind::Other,
+        "Unsupported public key type. Only hex-encoded ed25519 public keys are supported. They must start with `ed25519/`.",
+        ))?;
+        let bytes =
+            hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
+        let pubkey = PublicKey::from_bytes(&bytes?)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::PublicKey(name.to_string(), pubkey))
+      },
+      Some("integer") => {
+        let int = value
+            .parse()
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Integer(int)))
+      },
+      Some("date") => {
+        let date =
+            time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
+                .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        let timestamp = date
+            .unix_timestamp()
+            .try_into()
+            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Date(timestamp)))
+      },
+      Some("bytes") => {
+        let hex_bytes = value.strip_prefix("hex:").ok_or_else(|| {
+            Error::new(
+        ErrorKind::Other,
+        "Unusupported byte array literal. Byte arrays must be hex-encoded and start with `hex:`."
+        )
+        })?;
+        let bytes =
+            hex::decode(hex_bytes).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
+        Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
+      },
+      Some("bool") => {
+        if value.to_lowercase() == "true" {
+            Ok(Param::Term(name.to_string(), Term::Bool(true)))
+        } else if value.to_lowercase() == "false" {
+            Ok(Param::Term(name.to_string(), Term::Bool(false)))
+        } else {
+            Err(Error::new(
+                ErrorKind::Other,
+                "Boolean params must be either \"true\" or \"false\".",
+            ))
+        }
+      },
+      Some("string") | None => {
+        Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
+      },
+      _ => {
+        Err(Error::new(
+                ErrorKind::Other,
+                "Unsupported parameter type. Supported types are `pubkey`, `string`, `integer`, `date`, `bytes`, or `bool`.",
+            ))
+      }
+    }
+}
+
+pub fn parse_rule(rule: &str) -> Result<Rule, std::io::Error> {
+    use std::io::{Error, ErrorKind};
+    rule.try_into()
+        .map_err(|e| Error::new(ErrorKind::Other, format!("Could not parse rule: {e}")))
 }

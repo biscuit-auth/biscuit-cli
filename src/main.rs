@@ -132,7 +132,7 @@ fn handle_generate(generate: &Generate) -> Result<()> {
     let mut builder = Biscuit::builder();
     read_authority_from(
         &authority_from,
-        &generate.param,
+        &generate.param_arg.param,
         &generate.context,
         &mut builder,
     )?;
@@ -184,7 +184,7 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
 
     read_block_from(
         &block_from,
-        &attenuate.param,
+        &attenuate.param_arg.param,
         &attenuate.context,
         &mut block_builder,
     )?;
@@ -277,7 +277,7 @@ fn handle_generate_third_party_block(
     let mut builder = BlockBuilder::new();
     read_block_from(
         &block_from,
-        &generate_third_party_block.param,
+        &generate_third_party_block.param_arg.param,
         &generate_third_party_block.context,
         &mut builder,
     )?;

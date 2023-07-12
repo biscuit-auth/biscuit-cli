@@ -82,9 +82,9 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     };
 
     let authorizer_from = match (
-        &inspect.authorize_interactive,
-        &inspect.authorize_with,
-        &inspect.authorize_with_file,
+        &inspect.authorization_args.authorize_interactive,
+        &inspect.authorization_args.authorize_with,
+        &inspect.authorization_args.authorize_with_file,
     ) {
         (false, None, None) => None,
         (true, None, None) => Some(DatalogInput::FromEditor),
@@ -149,8 +149,12 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
 
         let mut authorizer_builder = biscuit.authorizer()?;
         if let Some(auth_from) = authorizer_from {
-            read_authorizer_from(&auth_from, &inspect.param, &mut authorizer_builder)?;
-            if inspect.include_time {
+            read_authorizer_from(
+                &auth_from,
+                &inspect.param_arg.param,
+                &mut authorizer_builder,
+            )?;
+            if inspect.authorization_args.include_time {
                 let now = Utc::now().to_rfc3339();
                 let time_fact = format!("time({})", now);
                 authorizer_builder.add_fact(time_fact.as_ref())?;
@@ -159,12 +163,15 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
 
             let authorizer_result = authorizer_builder.authorize_with_limits(RunLimits {
                 max_facts: inspect
+                    .authorization_args
                     .max_facts
                     .unwrap_or_else(|| RunLimits::default().max_facts),
                 max_iterations: inspect
+                    .authorization_args
                     .max_iterations
                     .unwrap_or_else(|| RunLimits::default().max_iterations),
                 max_time: inspect
+                    .authorization_args
                     .max_time
                     .map_or_else(|| RunLimits::default().max_time, |d| d.to_std().unwrap()),
             });
@@ -197,21 +204,21 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                 }
             }
 
-            if let Some(query) = &inspect.query {
+            if let Some(query) = &inspect.query_args.query {
                 handle_query(
                     query,
-                    inspect.query_all,
-                    &inspect.param,
+                    inspect.query_args.query_all,
+                    &inspect.param_arg.param,
                     &mut authorizer_builder,
                 )?;
             }
         } else {
             println!("🙈 Datalog check skipped 🛡️");
-            if let Some(query) = &inspect.query {
+            if let Some(query) = &inspect.query_args.query {
                 handle_query(
                     query,
-                    inspect.query_all,
-                    &inspect.param,
+                    inspect.query_args.query_all,
+                    &inspect.param_arg.param,
                     &mut authorizer_builder,
                 )?;
             }
@@ -244,11 +251,11 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
 
     println!("{}", authorizer.dump_code());
 
-    if let Some(query) = &inspect_snapshot.query {
+    if let Some(query) = &inspect_snapshot.query_args.query {
         handle_query(
             query,
-            inspect_snapshot.query_all,
-            &inspect_snapshot.param,
+            inspect_snapshot.query_args.query_all,
+            &inspect_snapshot.param_arg.param,
             &mut authorizer,
         )?;
     }
