@@ -251,9 +251,74 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
         BiscuitBytes::FromFile(snapshot_format, inspect_snapshot.snapshot_file.clone())
     };
 
+    let authorizer_from = match (
+        &inspect_snapshot.authorization_args.authorize_interactive,
+        &inspect_snapshot.authorization_args.authorize_with,
+        &inspect_snapshot.authorization_args.authorize_with_file,
+    ) {
+        (false, None, None) => None,
+        (true, None, None) => Some(DatalogInput::FromEditor),
+        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
+        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
+        // the other combinations are prevented by clap
+        _ => unreachable!(),
+    };
+
+    if let Some(vf) = &authorizer_from {
+        ensure_no_input_conflict(vf, &snapshot_from)?;
+    }
+
     let mut authorizer = read_snapshot_from(&snapshot_from)?;
 
     println!("{}", authorizer.dump_code());
+
+    if let Some(auth_from) = authorizer_from {
+        read_authorizer_from(
+            &auth_from,
+            &inspect_snapshot.param_arg.param,
+            &mut authorizer,
+        )?;
+        if inspect_snapshot.authorization_args.include_time {
+            let now = Utc::now().to_rfc3339();
+            let time_fact = format!("time({})", now);
+            authorizer.add_fact(time_fact.as_ref())?;
+        }
+        let (_, _, _, policies) = authorizer.dump();
+
+        let authorizer_result = authorizer.authorize_with_limits(RunLimits {
+            max_facts: inspect_snapshot
+                .authorization_args
+                .max_facts
+                .unwrap_or_else(|| RunLimits::default().max_facts),
+            max_iterations: inspect_snapshot
+                .authorization_args
+                .max_iterations
+                .unwrap_or_else(|| RunLimits::default().max_iterations),
+            max_time: inspect_snapshot
+                .authorization_args
+                .max_time
+                .map_or_else(|| RunLimits::default().max_time, |d| d.to_std().unwrap()),
+        });
+
+        match authorizer_result {
+            Ok(i) => {
+                println!("✅ Authorizer check succeeded 🛡️");
+                println!(
+                    "Matched allow policy: {}",
+                    policies.get(i).expect("Incorrect policy index")
+                );
+            }
+
+            Err(e) => {
+                println!("❌ Authorizer check failed 🛡️");
+                match e {
+                    Token::FailedLogic(l) => display_logic_error(&policies, &l),
+                    Token::RunLimit(l) => display_run_limit(&l),
+                    _ => {}
+                }
+            }
+        }
+    }
 
     if let Some(query) = &inspect_snapshot.query_args.query {
         handle_query(

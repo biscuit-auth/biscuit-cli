@@ -193,6 +193,8 @@ pub struct InspectSnapshot {
     #[clap(long)]
     pub raw_input: bool,
     #[clap(flatten)]
+    pub authorization_args: common_args::AuthorizeArgs,
+    #[clap(flatten)]
     pub query_args: common_args::QueryArgs,
     #[clap(flatten)]
     pub param_arg: common_args::ParamArg,
