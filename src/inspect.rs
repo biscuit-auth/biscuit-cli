@@ -98,6 +98,10 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
         ensure_no_input_conflict(vf, &biscuit_from)?;
     }
 
+    if inspect.query_args.query.is_some() && public_key_from.is_none() {
+        Err(MissingPublicKeyForQuerying)?;
+    }
+
     let biscuit = read_biscuit_from(&biscuit_from)?;
     let is_sealed = is_sealed(&biscuit)?;
 

@@ -23,4 +23,6 @@ pub enum CliError {
     InvalidDuration,
     #[error("A public key is required when authorizng a biscuit")]
     MissingPublicKeyForAuthorization,
+    #[error("A public key is required when querying a biscuit")]
+    MissingPublicKeyForQuerying,
 }
