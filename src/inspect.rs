@@ -52,16 +52,19 @@ fn handle_query(
 }
 
 pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
-    let biscuit_format = if inspect.raw_input {
+    let biscuit_format = if inspect.biscuit_input_args.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
         BiscuitFormat::Base64Biscuit
     };
 
-    let biscuit_from = if inspect.biscuit_file == PathBuf::from("-") {
+    let biscuit_from = if inspect.biscuit_input_args.biscuit_file == PathBuf::from("-") {
         BiscuitBytes::FromStdin(biscuit_format)
     } else {
-        BiscuitBytes::FromFile(biscuit_format, inspect.biscuit_file.clone())
+        BiscuitBytes::FromFile(
+            biscuit_format,
+            inspect.biscuit_input_args.biscuit_file.clone(),
+        )
     };
 
     let public_key_from = match (

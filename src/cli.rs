@@ -98,27 +98,13 @@ pub struct Generate {
 /// Attenuate an existing biscuit by adding a new block
 #[derive(Parser)]
 pub struct Attenuate {
-    /// Read the biscuit from the given file (or use `-` to read from stdin)
-    #[clap(parse(from_os_str))]
-    pub biscuit_file: PathBuf,
-    /// Read the biscuit raw bytes directly, with no base64 parsing
-    #[clap(long)]
-    pub raw_input: bool,
+    #[clap(flatten)]
+    pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
-    /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
-    #[clap(long)]
-    pub block: Option<String>,
-    /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
-    #[clap(long, parse(from_os_str), conflicts_with = "block")]
-    pub block_file: Option<PathBuf>,
-    /// The optional context string attached to the new block
-    #[clap(long)]
-    pub context: Option<String>,
-    /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
-    #[clap(long, parse(try_from_str = parse_ttl))]
-    pub add_ttl: Option<Ttl>,
+    #[clap(flatten)]
+    pub block_args: common_args::BlockArgs,
     #[clap(flatten)]
     pub param_arg: common_args::ParamArg,
 }
@@ -126,12 +112,8 @@ pub struct Attenuate {
 /// Attenuate an existing biscuit by adding a new third-party block
 #[derive(Parser)]
 pub struct AppendThirdPartyBlock {
-    /// Read the biscuit from the given file (or use `-` to read from stdin)
-    #[clap(parse(from_os_str))]
-    pub biscuit_file: PathBuf,
-    /// Read the biscuit raw bytes directly, with no base64 parsing
-    #[clap(long)]
-    pub raw_input: bool,
+    #[clap(flatten)]
+    pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
@@ -154,12 +136,8 @@ pub struct AppendThirdPartyBlock {
 /// Inspect a biscuit and optionally check its public key
 #[derive(Parser)]
 pub struct Inspect {
-    /// Read the biscuit from the given file (or use `-` to read from stdin)
-    #[clap(parse(from_os_str))]
-    pub biscuit_file: PathBuf,
-    /// Read the biscuit raw bytes directly, with no base64 parsing
-    #[clap(long)]
-    pub raw_input: bool,
+    #[clap(flatten)]
+    pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Check the biscuit public key
     #[clap(long, conflicts_with("public-key-file"))]
     pub public_key: Option<String>,
@@ -203,12 +181,8 @@ pub struct InspectSnapshot {
 /// Generate a third-party block request from an existing biscuit
 #[derive(Parser)]
 pub struct GenerateRequest {
-    /// Read the biscuit from the given file (or use `-` to read from stdin)
-    #[clap(parse(from_os_str))]
-    pub biscuit_file: PathBuf,
-    /// Read the biscuit raw bytes directly, with no base64 parsing
-    #[clap(long)]
-    pub raw_input: bool,
+    #[clap(flatten)]
+    pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Output the request raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
@@ -240,18 +214,8 @@ pub struct GenerateThirdPartyBlock {
     /// Output the block raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
-    /// The block to generate. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
-    #[clap(long)]
-    pub block: Option<String>,
-    /// The block to generate. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
-    #[clap(long, parse(from_os_str), conflicts_with = "block")]
-    pub block_file: Option<PathBuf>,
-    /// The optional context string attached to the new block
-    #[clap(long)]
-    pub context: Option<String>,
-    /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
-    #[clap(long, parse(try_from_str = parse_ttl))]
-    pub add_ttl: Option<Ttl>,
+    #[clap(flatten)]
+    pub block_args: common_args::BlockArgs,
     #[clap(flatten)]
     pub param_arg: common_args::ParamArg,
 }
@@ -259,12 +223,8 @@ pub struct GenerateThirdPartyBlock {
 /// Seal a token, preventing further attenuation
 #[derive(Parser)]
 pub struct Seal {
-    /// Read the biscuit from the given file (or use `-` to read from stdin)
-    #[clap(parse(from_os_str))]
-    pub biscuit_file: PathBuf,
-    /// Read the biscuit raw bytes directly, with no base64 parsing
-    #[clap(long)]
-    pub raw_input: bool,
+    #[clap(flatten)]
+    pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
@@ -363,5 +323,33 @@ mod common_args {
         /// Include the current time in the verifier facts
         #[clap(long)]
         pub include_time: bool,
+    }
+
+    /// Arguments related to defining a block
+    #[derive(Parser)]
+    pub struct BlockArgs {
+        /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+        #[clap(long)]
+        pub block: Option<String>,
+        /// The block to append to the token. If `--block` and `--block-file` are omitted, an interactive $EDITOR will be opened.
+        #[clap(long, parse(from_os_str), conflicts_with = "block")]
+        pub block_file: Option<PathBuf>,
+        /// The optional context string attached to the new block
+        #[clap(long)]
+        pub context: Option<String>,
+        /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
+        #[clap(long, parse(try_from_str = parse_ttl))]
+        pub add_ttl: Option<Ttl>,
+    }
+
+    /// Arguments related to reading a biscuit
+    #[derive(Parser)]
+    pub struct BiscuitInputArgs {
+        /// Read the biscuit from the given file (or use `-` to read from stdin)
+        #[clap(parse(from_os_str))]
+        pub biscuit_file: PathBuf,
+        /// Read the biscuit raw bytes directly, with no base64 parsing
+        #[clap(long)]
+        pub raw_input: bool,
     }
 }

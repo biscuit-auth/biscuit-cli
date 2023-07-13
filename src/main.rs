@@ -157,19 +157,25 @@ fn handle_generate(generate: &Generate) -> Result<()> {
 }
 
 fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
-    let biscuit_format = if attenuate.raw_input {
+    let biscuit_format = if attenuate.biscuit_input_args.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
         BiscuitFormat::Base64Biscuit
     };
 
-    let biscuit_from = if attenuate.biscuit_file == PathBuf::from("-") {
+    let biscuit_from = if attenuate.biscuit_input_args.biscuit_file == PathBuf::from("-") {
         BiscuitBytes::FromStdin(biscuit_format)
     } else {
-        BiscuitBytes::FromFile(biscuit_format, attenuate.biscuit_file.clone())
+        BiscuitBytes::FromFile(
+            biscuit_format,
+            attenuate.biscuit_input_args.biscuit_file.clone(),
+        )
     };
 
-    let block_from = match (&attenuate.block_file, &attenuate.block) {
+    let block_from = match (
+        &attenuate.block_args.block_file,
+        &attenuate.block_args.block,
+    ) {
         (Some(file), None) => DatalogInput::FromFile(file.to_path_buf()),
         (None, Some(str)) => DatalogInput::DatalogString(str.to_owned()),
         (None, None) => DatalogInput::FromEditor,
@@ -185,11 +191,11 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
     read_block_from(
         &block_from,
         &attenuate.param_arg.param,
-        &attenuate.context,
+        &attenuate.block_args.context,
         &mut block_builder,
     )?;
 
-    if let Some(ttl) = &attenuate.add_ttl {
+    if let Some(ttl) = &attenuate.block_args.add_ttl {
         block_builder.check_expiration_date(ttl.to_datetime().into());
     }
 
@@ -204,16 +210,19 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
 }
 
 fn handle_generate_request(generate_request: &GenerateRequest) -> Result<()> {
-    let biscuit_format = if generate_request.raw_input {
+    let biscuit_format = if generate_request.biscuit_input_args.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
         BiscuitFormat::Base64Biscuit
     };
 
-    let biscuit_from = if generate_request.biscuit_file == PathBuf::from("-") {
+    let biscuit_from = if generate_request.biscuit_input_args.biscuit_file == PathBuf::from("-") {
         BiscuitBytes::FromStdin(biscuit_format)
     } else {
-        BiscuitBytes::FromFile(biscuit_format, generate_request.biscuit_file.clone())
+        BiscuitBytes::FromFile(
+            biscuit_format,
+            generate_request.biscuit_input_args.biscuit_file.clone(),
+        )
     };
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
@@ -248,8 +257,8 @@ fn handle_generate_third_party_block(
     };
 
     let block_from = match (
-        &generate_third_party_block.block_file,
-        &generate_third_party_block.block,
+        &generate_third_party_block.block_args.block_file,
+        &generate_third_party_block.block_args.block,
     ) {
         (Some(file), None) => DatalogInput::FromFile(file.to_path_buf()),
         (None, Some(str)) => DatalogInput::DatalogString(str.to_owned()),
@@ -278,11 +287,11 @@ fn handle_generate_third_party_block(
     read_block_from(
         &block_from,
         &generate_third_party_block.param_arg.param,
-        &generate_third_party_block.context,
+        &generate_third_party_block.block_args.context,
         &mut builder,
     )?;
 
-    if let Some(ttl) = &generate_third_party_block.add_ttl {
+    if let Some(ttl) = &generate_third_party_block.block_args.add_ttl {
         builder.check_expiration_date(ttl.to_datetime().into());
     }
 
@@ -298,20 +307,24 @@ fn handle_generate_third_party_block(
 }
 
 fn handle_append_third_party_block(append_third_party_block: &AppendThirdPartyBlock) -> Result<()> {
-    let biscuit_format = if append_third_party_block.raw_input {
+    let biscuit_format = if append_third_party_block.biscuit_input_args.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
         BiscuitFormat::Base64Biscuit
     };
 
-    let biscuit_from = if append_third_party_block.biscuit_file == PathBuf::from("-") {
-        BiscuitBytes::FromStdin(biscuit_format)
-    } else {
-        BiscuitBytes::FromFile(
-            biscuit_format,
-            append_third_party_block.biscuit_file.clone(),
-        )
-    };
+    let biscuit_from =
+        if append_third_party_block.biscuit_input_args.biscuit_file == PathBuf::from("-") {
+            BiscuitBytes::FromStdin(biscuit_format)
+        } else {
+            BiscuitBytes::FromFile(
+                biscuit_format,
+                append_third_party_block
+                    .biscuit_input_args
+                    .biscuit_file
+                    .clone(),
+            )
+        };
 
     let block_file_format = if append_third_party_block.raw_block_contents {
         BiscuitFormat::RawBiscuit
@@ -348,16 +361,16 @@ fn handle_append_third_party_block(append_third_party_block: &AppendThirdPartyBl
 }
 
 fn handle_seal(seal: &Seal) -> Result<()> {
-    let biscuit_format = if seal.raw_input {
+    let biscuit_format = if seal.biscuit_input_args.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
         BiscuitFormat::Base64Biscuit
     };
 
-    let biscuit_from = if seal.biscuit_file == PathBuf::from("-") {
+    let biscuit_from = if seal.biscuit_input_args.biscuit_file == PathBuf::from("-") {
         BiscuitBytes::FromStdin(biscuit_format)
     } else {
-        BiscuitBytes::FromFile(biscuit_format, seal.biscuit_file.clone())
+        BiscuitBytes::FromFile(biscuit_format, seal.biscuit_input_args.biscuit_file.clone())
     };
 
     let biscuit = read_biscuit_from(&biscuit_from)?;
