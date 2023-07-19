@@ -15,21 +15,13 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "keypair")]
     KeyPairCmd(KeyPairCmd),
-    #[clap()]
     Inspect(Inspect),
-    #[clap()]
     InspectSnapshot(InspectSnapshot),
-    #[clap()]
     Generate(Generate),
-    #[clap()]
     Attenuate(Attenuate),
-    #[clap()]
     GenerateRequest(GenerateRequest),
-    #[clap()]
     GenerateThirdPartyBlock(GenerateThirdPartyBlock),
-    #[clap()]
     AppendThirdPartyBlock(AppendThirdPartyBlock),
-    #[clap()]
     Seal(Seal),
 }
 
