@@ -59,11 +59,36 @@ impl TokenDescription {
     }
 }
 
+#[derive(Copy, Clone, Serialize)]
+#[serde(untagged)]
+enum RResult<A, E> {
+    Ok(A),
+    Err { error: E },
+}
+
+impl<A, E> From<std::result::Result<A, E>> for RResult<A, E> {
+    fn from(value: std::result::Result<A, E>) -> Self {
+        match value {
+            Ok(a) => Self::Ok(a),
+            Err(error) => Self::Err { error },
+        }
+    }
+}
+
+impl<A, E> RResult<A, E> {
+    pub fn into_result(self) -> std::result::Result<A, E> {
+        match self {
+            Self::Ok(a) => Ok(a),
+            Self::Err { error } => Err(error),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct QueryResult {
     query: String,
     query_all: bool,
-    facts: std::result::Result<Vec<String>, Token>,
+    facts: RResult<Vec<String>, Token>,
 }
 
 impl QueryResult {
@@ -74,7 +99,7 @@ impl QueryResult {
         } else {
             println!("🔎 Running query: {}", &self.query);
         }
-        match &self.facts {
+        match &self.facts.clone().into_result() {
             Ok(facts) => {
                 if facts.is_empty() {
                     println!("❌ No results");
@@ -94,12 +119,12 @@ impl QueryResult {
 #[derive(Serialize)]
 struct AuthResult {
     policies: Vec<String>,
-    result: std::result::Result<(usize, String), Token>,
+    result: RResult<(usize, String), Token>,
 }
 
 impl AuthResult {
     fn render(&self) {
-        match &self.result {
+        match &self.result.clone().into_result() {
             Ok((_, policy)) => {
                 println!("✅ Authorizer check succeeded 🛡️");
                 println!("Matched allow policy: {}", policy);
@@ -151,13 +176,13 @@ impl InspectionResults {
         }
 
         if let Some(ref auth) = self.auth {
-            if auth.result.is_err() {
+            if auth.result.clone().into_result().is_err() {
                 Err(AuthorizationFailed)?;
             }
         }
 
         if let Some(ref query) = self.query {
-            if query.facts.is_err() {
+            if query.facts.clone().into_result().is_err() {
                 Err(QueryFailed)?;
             }
         }
@@ -194,7 +219,9 @@ fn handle_query(
     Ok(QueryResult {
         query: query.to_string(),
         query_all,
-        facts: facts.map(|fs| fs.iter().map(|f| f.to_string()).collect::<Vec<_>>()),
+        facts: facts
+            .map(|fs| fs.iter().map(|f| f.to_string()).collect::<Vec<_>>())
+            .into(),
     })
 }
 
@@ -332,12 +359,14 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
 
                 auth_result = Some(AuthResult {
                     policies: policies.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
-                    result: authorizer_result.map(|i| {
-                        (
-                            i,
-                            policies.get(i).expect("Incorrect policy index").to_string(),
-                        )
-                    }),
+                    result: authorizer_result
+                        .map(|i| {
+                            (
+                                i,
+                                policies.get(i).expect("Incorrect policy index").to_string(),
+                            )
+                        })
+                        .into(),
                 });
 
                 if let Some(snapshot_file) = &inspect.dump_snapshot_to {
