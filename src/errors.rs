@@ -25,4 +25,10 @@ pub enum CliError {
     MissingPublicKeyForAuthorization,
     #[error("A public key is required when querying a biscuit")]
     MissingPublicKeyForQuerying,
+    #[error("Signatures check failed")]
+    SignaturesCheckFailed,
+    #[error("Authorization failed")]
+    AuthorizationFailed,
+    #[error("Querying failed")]
+    QueryFailed,
 }

@@ -128,6 +128,9 @@ pub struct AppendThirdPartyBlock {
 /// Inspect a biscuit and optionally check its public key
 #[derive(Parser)]
 pub struct Inspect {
+    /// Output the results in a machine-readable format
+    #[clap(long)]
+    pub json: bool,
     #[clap(flatten)]
     pub biscuit_input_args: common_args::BiscuitInputArgs,
     /// Check the biscuit public key

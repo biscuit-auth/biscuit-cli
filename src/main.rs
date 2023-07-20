@@ -5,6 +5,7 @@ use biscuit_auth::{
     Biscuit, {KeyPair, PrivateKey},
 };
 use clap::Parser;
+use serde_json;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
