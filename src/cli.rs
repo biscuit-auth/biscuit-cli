@@ -1,3 +1,4 @@
+use biscuit_auth::builder::Rule;
 use biscuit_auth::{builder::Term, PublicKey};
 use chrono::Duration;
 use clap::Parser;
@@ -87,6 +88,12 @@ fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
     }
 }
 
+fn parse_rule(rule: &str) -> Result<Rule, std::io::Error> {
+    use std::io::{Error, ErrorKind};
+    rule.try_into()
+        .map_err(|e| Error::new(ErrorKind::Other, format!("Could not parse rule: {e}")))
+}
+
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
 #[clap(version = "0.2.0", author = "Clément D. <clement@delafargue.name>")]
@@ -152,7 +159,8 @@ pub struct Generate {
     /// Provide a root key id, as a hint for public key selection
     #[clap(long)]
     pub root_key_id: Option<u32>,
-    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Provide a value for a datalog parameter for use in the query.
+    /// `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
     /// Bytes values must be hex-encoded and start with `hex:`
     /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(
@@ -340,6 +348,17 @@ pub struct Inspect {
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
+    /// Query the authorizer after evaluation. If no authorizer is provided, query the token after evaluation.
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_rule),
+        requires("public-key"),
+        requires("public-key-file"),
+    )]
+    pub query: Option<Rule>,
+    /// Query facts from all blocks (not just authority, authorizer or explicitly trusted blocks). Be careful, this can return untrustworthy facts.
+    #[clap(long, requires("query"))]
+    pub query_all: bool,
 }
 
 /// Inspect a snapshot
@@ -351,6 +370,25 @@ pub struct InspectSnapshot {
     /// Read the snapshot raw bytes directly, with no base64 parsing
     #[clap(long)]
     pub raw_input: bool,
+    /// Query the snapshot
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_rule),
+    )]
+    pub query: Option<Rule>,
+    /// Query facts from all blocks (not just authority, authorizer or explicitly trusted blocks). Be careful, this can return untrustworthy facts.
+    #[clap(long, requires("query"))]
+    pub query_all: bool,
+    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Bytes values must be hex-encoded and start with `hex:`
+    /// Public keys must be hex-encoded and start with `ed25519/`
+    #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key[:type]=value",
+        requires("query-snapshot")
+    )]
+    pub param: Vec<Param>,
 }
 
 /// Generate a third-party block request from an existing biscuit
@@ -405,7 +443,8 @@ pub struct GenerateThirdPartyBlock {
     /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
-    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+    /// Provide a value for a datalog parameter, for use in the authorizer or in the query.
+    /// `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
     /// Bytes values must be hex-encoded and start with `hex:`
     /// Public keys must be hex-encoded and start with `ed25519/`
     #[clap(

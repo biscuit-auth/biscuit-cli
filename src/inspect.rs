@@ -1,9 +1,9 @@
 use anyhow::Result;
 use biscuit_auth::{
-    builder::Policy,
+    builder::{Fact, Policy, Rule},
     datalog::RunLimits,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
-    UnverifiedBiscuit,
+    Authorizer, UnverifiedBiscuit,
 };
 use chrono::offset::Utc;
 use std::fs;
@@ -12,6 +12,44 @@ use std::path::PathBuf;
 use crate::cli::*;
 use crate::errors::CliError::*;
 use crate::input::*;
+
+fn handle_query(
+    query: &Rule,
+    query_all: bool,
+    all_params: &[Param],
+    authorizer: &mut Authorizer,
+) -> Result<()> {
+    let mut rule = query.clone();
+
+    for p in all_params {
+        match p {
+            Param::Term(name, t) => {
+                rule.set_lenient(name, t)?;
+            }
+            Param::PublicKey(name, pk) => {
+                rule.set_scope_lenient(name, *pk)?;
+            }
+        }
+    }
+
+    let facts: Vec<Fact> = if query_all {
+        authorizer.query_all(rule.clone())?
+    } else {
+        authorizer.query(rule.clone())?
+    };
+
+    println!();
+    println!("🔎 Running query: {}", &rule);
+    if facts.is_empty() {
+        println!("❌ No results");
+    } else {
+        for fact in facts {
+            println!("{}", &fact);
+        }
+    }
+
+    Ok(())
+}
 
 pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
     let biscuit_format = if inspect.raw_input {
@@ -109,8 +147,8 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
         let biscuit = sig_result?;
         println!("✅ Public key check succeeded 🔑");
 
+        let mut authorizer_builder = biscuit.authorizer()?;
         if let Some(auth_from) = authorizer_from {
-            let mut authorizer_builder = biscuit.authorizer()?;
             read_authorizer_from(&auth_from, &inspect.param, &mut authorizer_builder)?;
             if inspect.include_time {
                 let now = Utc::now().to_rfc3339();
@@ -158,8 +196,25 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
                     fs::write(snapshot_file, str)?;
                 }
             }
+
+            if let Some(query) = &inspect.query {
+                handle_query(
+                    query,
+                    inspect.query_all,
+                    &inspect.param,
+                    &mut authorizer_builder,
+                )?;
+            }
         } else {
             println!("🙈 Datalog check skipped 🛡️");
+            if let Some(query) = &inspect.query {
+                handle_query(
+                    query,
+                    inspect.query_all,
+                    &inspect.param,
+                    &mut authorizer_builder,
+                )?;
+            }
         }
     } else {
         println!("🙈 Public key check skipped 🔑");
@@ -185,9 +240,18 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
         BiscuitBytes::FromFile(snapshot_format, inspect_snapshot.snapshot_file.clone())
     };
 
-    let authorizer = read_snapshot_from(&snapshot_from)?;
+    let mut authorizer = read_snapshot_from(&snapshot_from)?;
 
     println!("{}", authorizer.dump_code());
+
+    if let Some(query) = &inspect_snapshot.query {
+        handle_query(
+            query,
+            inspect_snapshot.query_all,
+            &inspect_snapshot.param,
+            &mut authorizer,
+        )?;
+    }
 
     Ok(())
 }
