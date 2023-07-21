@@ -1,102 +1,11 @@
-use biscuit_auth::builder::Rule;
-use biscuit_auth::{builder::Term, PublicKey};
-use chrono::Duration;
 use clap::Parser;
-use std::convert::TryInto;
 use std::path::PathBuf;
 
 use crate::input::*;
 
-#[derive(Debug, Clone)]
-pub enum Param {
-    Term(String, Term),
-    PublicKey(String, PublicKey),
-}
-
-fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
-    use std::io::{Error, ErrorKind};
-    let (binding, value) = (kv.split_once('=').ok_or_else(|| Error::new(
-        ErrorKind::Other,
-        "Params must be `key=value` or `key:type=value` where type is pubkey, string, integer, date, bytes or bool.",
-    )))?;
-
-    let (name, annotation) = match binding.rsplit_once(':') {
-        None => (binding, None),
-        Some((name, annotation)) => (name, Some(annotation)),
-    };
-
-    match annotation {
-      Some("pubkey") => {
-        let hex_key = value.strip_prefix("ed25519/").ok_or_else(|| Error::new(
-        ErrorKind::Other,
-        "Unsupported public key type. Only hex-encoded ed25519 public keys are supported. They must start with `ed25519/`.",
-        ))?;
-        let bytes =
-            hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
-        let pubkey = PublicKey::from_bytes(&bytes?)
-            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
-        Ok(Param::PublicKey(name.to_string(), pubkey))
-      },
-      Some("integer") => {
-        let int = value
-            .parse()
-            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
-        Ok(Param::Term(name.to_string(), Term::Integer(int)))
-      },
-      Some("date") => {
-        let date =
-            time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
-                .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
-        let timestamp = date
-            .unix_timestamp()
-            .try_into()
-            .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
-        Ok(Param::Term(name.to_string(), Term::Date(timestamp)))
-      },
-      Some("bytes") => {
-        let hex_bytes = value.strip_prefix("hex:").ok_or_else(|| {
-            Error::new(
-        ErrorKind::Other,
-        "Unusupported byte array literal. Byte arrays must be hex-encoded and start with `hex:`."
-        )
-        })?;
-        let bytes =
-            hex::decode(hex_bytes).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
-        Ok(Param::Term(name.to_string(), Term::Bytes(bytes)))
-      },
-      Some("bool") => {
-        if value.to_lowercase() == "true" {
-            Ok(Param::Term(name.to_string(), Term::Bool(true)))
-        } else if value.to_lowercase() == "false" {
-            Ok(Param::Term(name.to_string(), Term::Bool(false)))
-        } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                "Boolean params must be either \"true\" or \"false\".",
-            ))
-        }
-      },
-      Some("string") | None => {
-        Ok(Param::Term(name.to_string(), Term::Str(value.to_string())))
-      },
-      _ => {
-        Err(Error::new(
-                ErrorKind::Other,
-                "Unsupported parameter type. Supported types are `pubkey`, `string`, `integer`, `date`, `bytes`, or `bool`.",
-            ))
-      }
-    }
-}
-
-fn parse_rule(rule: &str) -> Result<Rule, std::io::Error> {
-    use std::io::{Error, ErrorKind};
-    rule.try_into()
-        .map_err(|e| Error::new(ErrorKind::Other, format!("Could not parse rule: {e}")))
-}
-
 /// biscuit creation and inspection CLI. Run `biscuit --help` to see what's available.
 #[derive(Parser)]
-#[clap(version = "0.2.0", author = "Clément D. <clement@delafargue.name>")]
+#[clap(version, author)]
 pub struct Opts {
     #[clap(subcommand)]
     pub subcmd: SubCommand,
@@ -151,7 +60,7 @@ pub struct KeyPairCmd {
 }
 
 /// Generate a biscuit from a private key and an authority block
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 pub struct Generate {
     /// Read the authority block from the given file (or use `-` to read from stdin). If omitted, an interactive $EDITOR will be opened.
     #[clap(parse(from_os_str))]
@@ -159,16 +68,8 @@ pub struct Generate {
     /// Provide a root key id, as a hint for public key selection
     #[clap(long)]
     pub root_key_id: Option<u32>,
-    /// Provide a value for a datalog parameter for use in the query.
-    /// `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
-    /// Bytes values must be hex-encoded and start with `hex:`
-    /// Public keys must be hex-encoded and start with `ed25519/`
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key[:type]=value"
-    )]
-    pub param: Vec<Param>,
+    #[clap(flatten)]
+    pub param_arg: common_args::ParamArg,
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw: bool,
@@ -218,15 +119,8 @@ pub struct Attenuate {
     /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
-    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
-    /// Bytes values must be hex-encoded and start with `hex:`
-    /// Public keys must be hex-encoded and start with `ed25519/`
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key[:type]=value"
-    )]
-    pub param: Vec<Param>,
+    #[clap(flatten)]
+    pub param_arg: common_args::ParamArg,
 }
 
 /// Attenuate an existing biscuit by adding a new third-party block
@@ -275,90 +169,18 @@ pub struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     pub raw_public_key: bool,
-    /// Open $EDITOR to provide an authorizer.
-    #[clap(
-        long,
-        alias("verify-interactive"),
-        conflicts_with("authorize-with"),
-        conflicts_with("authorize-with-file")
-    )]
-    pub authorize_interactive: bool,
-    /// Authorize the biscuit with the provided authorizer.
-    #[clap(
-        long,
-        parse(from_os_str),
-        alias("verify-with-file"),
-        conflicts_with("authorize-with"),
-        conflicts_with("authorize-interactive")
-    )]
-    pub authorize_with_file: Option<PathBuf>,
-    /// Authorize the biscuit with the provided authorizer
-    #[clap(
-        long,
-        alias("verify-with"),
-        conflicts_with("authorize-with-file"),
-        conflicts_with("authorize-interactive")
-    )]
-    pub authorize_with: Option<String>,
-    /// Configure the maximum amount of facts that can be generated
-    /// before aborting evaluation
-    #[clap(
-        long,
-        requires("authorize-with"),
-        requires("authorize-interactive"),
-        requires("authorize-with-file")
-    )]
-    pub max_facts: Option<u64>,
-    /// Configure the maximum amount of iterations before aborting
-    /// evaluation
-    #[clap(
-        long,
-        requires("authorize-with"),
-        requires("authorize-interactive"),
-        requires("authorize-with-file")
-    )]
-    pub max_iterations: Option<u64>,
-    #[clap(
-        long,
-        requires("authorize-with"),
-        requires("authorize-interactive"),
-        requires("authorize-with-file"),
-        parse(try_from_str = parse_duration)
-    )]
-    /// Configure the maximum evaluation duration before aborting
-    pub max_time: Option<Duration>,
-    /// Include the current time in the verifier facts
-    #[clap(long)]
-    pub include_time: bool,
-    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
-    /// Bytes values must be hex-encoded and start with `hex:`
-    /// Public keys must be hex-encoded and start with `ed25519/`
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key[:type]=value",
-        requires("authorize-with"),
-        requires("authorize-interactive"),
-        requires("authorize-with-file")
-    )]
-    pub param: Vec<Param>,
+    #[clap(flatten)]
+    pub authorization_args: common_args::AuthorizeArgs,
+    #[clap(flatten)]
+    pub query_args: common_args::QueryArgs,
+    #[clap(flatten)]
+    pub param_arg: common_args::ParamArg,
     /// Save an authorizer snapshot to a file
     #[clap(long, parse(from_os_str))]
     pub dump_snapshot_to: Option<PathBuf>,
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
-    /// Query the authorizer after evaluation. If no authorizer is provided, query the token after evaluation.
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_rule),
-        requires("public-key"),
-        requires("public-key-file"),
-    )]
-    pub query: Option<Rule>,
-    /// Query facts from all blocks (not just authority, authorizer or explicitly trusted blocks). Be careful, this can return untrustworthy facts.
-    #[clap(long, requires("query"))]
-    pub query_all: bool,
 }
 
 /// Inspect a snapshot
@@ -370,25 +192,10 @@ pub struct InspectSnapshot {
     /// Read the snapshot raw bytes directly, with no base64 parsing
     #[clap(long)]
     pub raw_input: bool,
-    /// Query the snapshot
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_rule),
-    )]
-    pub query: Option<Rule>,
-    /// Query facts from all blocks (not just authority, authorizer or explicitly trusted blocks). Be careful, this can return untrustworthy facts.
-    #[clap(long, requires("query"))]
-    pub query_all: bool,
-    /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
-    /// Bytes values must be hex-encoded and start with `hex:`
-    /// Public keys must be hex-encoded and start with `ed25519/`
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key[:type]=value",
-        requires("query-snapshot")
-    )]
-    pub param: Vec<Param>,
+    #[clap(flatten)]
+    pub query_args: common_args::QueryArgs,
+    #[clap(flatten)]
+    pub param_arg: common_args::ParamArg,
 }
 
 /// Generate a third-party block request from an existing biscuit
@@ -443,16 +250,8 @@ pub struct GenerateThirdPartyBlock {
     /// Add a TTL check to the generated block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
-    /// Provide a value for a datalog parameter, for use in the authorizer or in the query.
-    /// `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
-    /// Bytes values must be hex-encoded and start with `hex:`
-    /// Public keys must be hex-encoded and start with `ed25519/`
-    #[clap(
-        long,
-        value_parser = clap::builder::ValueParser::new(parse_param),
-        value_name = "key[:type]=value",
-    )]
-    pub param: Vec<Param>,
+    #[clap(flatten)]
+    pub param_arg: common_args::ParamArg,
 }
 
 /// Seal a token, preventing further attenuation
@@ -467,4 +266,100 @@ pub struct Seal {
     /// Output the biscuit raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
+}
+
+mod common_args {
+    use crate::input::*;
+    use biscuit_auth::builder::Rule;
+    use chrono::Duration;
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    /// Arguments related to queries
+    #[derive(Parser)]
+    pub struct QueryArgs {
+        /// Query the authorizer after evaluation. If no authorizer is provided, query the token after evaluation.
+        #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_rule),
+    )]
+        pub query: Option<Rule>,
+        /// Query facts from all blocks (not just authority, authorizer or explicitly trusted blocks). Be careful, this can return untrustworthy facts.
+        #[clap(long, requires("query"))]
+        pub query_all: bool,
+    }
+
+    /// Arguments related to providing datalog parameters
+    #[derive(Parser)]
+    pub struct ParamArg {
+        /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
+        /// Bytes values must be hex-encoded and start with `hex:`
+        /// Public keys must be hex-encoded and start with `ed25519/`
+        #[clap(
+        long,
+        value_parser = clap::builder::ValueParser::new(parse_param),
+        value_name = "key[:type]=value"
+    )]
+        pub param: Vec<Param>,
+    }
+
+    /// Arguments related to running authorization
+    #[derive(Parser)]
+    pub struct AuthorizeArgs {
+        /// Open $EDITOR to provide an authorizer.
+        #[clap(
+            long,
+            alias("verify-interactive"),
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-file")
+        )]
+        pub authorize_interactive: bool,
+        /// Authorize the biscuit with the provided authorizer.
+        #[clap(
+            long,
+            parse(from_os_str),
+            alias("verify-with-file"),
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-interactive")
+        )]
+        pub authorize_with_file: Option<PathBuf>,
+        /// Authorize the biscuit with the provided authorizer
+        #[clap(
+            long,
+            alias("verify-with"),
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-interactive")
+        )]
+        pub authorize_with: Option<String>,
+        /// Configure the maximum amount of facts that can be generated
+        /// before aborting evaluation
+        #[clap(
+            long,
+            requires("authorize-with"),
+            requires("authorize-interactive"),
+            requires("authorize-with-file")
+        )]
+        pub max_facts: Option<u64>,
+        /// Configure the maximum amount of iterations before aborting
+        /// evaluation
+        #[clap(
+            long,
+            requires("authorize-with"),
+            requires("authorize-interactive"),
+            requires("authorize-with-file")
+        )]
+        pub max_iterations: Option<u64>,
+        /// Configure the maximum evaluation duration before aborting
+        #[clap(
+            long,
+            requires("authorize-with"),
+            requires("authorize-interactive"),
+            requires("authorize-with-file"),
+            parse(try_from_str = parse_duration)
+        )]
+        pub max_time: Option<Duration>,
+        /// Include the current time in the verifier facts
+        #[clap(long)]
+        pub include_time: bool,
+    }
 }
