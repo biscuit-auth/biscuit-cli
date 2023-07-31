@@ -7,6 +7,7 @@ use biscuit_auth::{
 };
 use chrono::offset::Utc;
 use serde::Serialize;
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -226,13 +227,22 @@ fn handle_query(
 }
 
 pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
-    let res = handle_inspect_inner(inspect)?;
-    if inspect.json {
-        println!("{}", serde_json::to_string(&res)?);
-    } else {
-        res.render();
+    match handle_inspect_inner(inspect) {
+        Ok(res) => {
+            if inspect.json {
+                println!("{}", serde_json::to_string(&res)?);
+            } else {
+                res.render();
+            }
+            res.ensure_success()
+        }
+        Err(e) => {
+            if inspect.json {
+                println!("{}", json!({ "error": e.to_string() }))
+            }
+            Err(e)
+        }
     }
-    res.ensure_success()
 }
 
 pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
