@@ -1,3 +1,10 @@
+# `0.4.1` (not released yet)
+
+- support for querying authorizers and snapshots (#45)
+- internal refactor, fix displayed version number (#46)
+- support for running authorization on a snapshot (#47)
+- biscuit-auth 4.0.0 (#50)
+
 # `0.4.0`
 
 - support for viewing and setting root key ids (#41)
