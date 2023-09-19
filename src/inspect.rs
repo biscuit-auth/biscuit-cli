@@ -193,15 +193,33 @@ impl InspectionResults {
 }
 
 #[derive(Serialize)]
-pub struct SnapshotInspectionResults {
+struct SnapshotDescription {
     code: String,
+    iterations: u64,
+    elapsed_micros: u128,
+}
+
+impl SnapshotDescription {
+    pub fn render(&self) {
+        println!("{}", self.code);
+
+        println!(
+            "⏱️ Execution time: {}μs ({} iterations)",
+            self.elapsed_micros, self.iterations
+        );
+    }
+}
+
+#[derive(Serialize)]
+pub struct SnapshotInspectionResults {
+    snapshot: SnapshotDescription,
     auth: Option<AuthResult>,
     query: Option<QueryResult>,
 }
 
 impl SnapshotInspectionResults {
     pub fn render(&self) {
-        println!("{}", self.code);
+        self.snapshot.render();
 
         match &self.auth {
             None => println!("🙈 Datalog check skipped 🛡️"),
@@ -525,7 +543,11 @@ pub fn handle_inspect_snapshot_inner(
     }
 
     let mut authorizer = read_snapshot_from(&snapshot_from)?;
-    let code = authorizer.dump_code();
+    let snapshot_description = SnapshotDescription {
+        code: authorizer.dump_code(),
+        iterations: authorizer.iterations(),
+        elapsed_micros: authorizer.execution_time().as_micros(),
+    };
 
     let auth_result;
     let query_result;
@@ -584,7 +606,7 @@ pub fn handle_inspect_snapshot_inner(
     }
 
     Ok(SnapshotInspectionResults {
-        code,
+        snapshot: snapshot_description,
         auth: auth_result,
         query: query_result,
     })
