@@ -192,6 +192,45 @@ impl InspectionResults {
     }
 }
 
+#[derive(Serialize)]
+pub struct SnapshotInspectionResults {
+    code: String,
+    auth: Option<AuthResult>,
+    query: Option<QueryResult>,
+}
+
+impl SnapshotInspectionResults {
+    pub fn render(&self) {
+        println!("{}", self.code);
+
+        match &self.auth {
+            None => println!("🙈 Datalog check skipped 🛡️"),
+            Some(auth_result) => auth_result.render(),
+        }
+
+        match &self.query {
+            None => {}
+            Some(query_result) => query_result.render(),
+        }
+    }
+
+    pub fn ensure_success(&self) -> Result<()> {
+        if let Some(ref auth) = self.auth {
+            if auth.result.clone().into_result().is_err() {
+                Err(AuthorizationFailed)?;
+            }
+        }
+
+        if let Some(ref query) = self.query {
+            if query.facts.clone().into_result().is_err() {
+                Err(QueryFailed)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 fn handle_query(
     query: &Rule,
     query_all: bool,
@@ -435,6 +474,27 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
 }
 
 pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()> {
+    match handle_inspect_snapshot_inner(inspect_snapshot) {
+        Ok(res) => {
+            if inspect_snapshot.json {
+                println!("{}", serde_json::to_string(&res)?);
+            } else {
+                res.render();
+            }
+            res.ensure_success()
+        }
+        Err(e) => {
+            if inspect_snapshot.json {
+                println!("{}", json!({ "error": e.to_string() }))
+            }
+            Err(e)
+        }
+    }
+}
+
+pub fn handle_inspect_snapshot_inner(
+    inspect_snapshot: &InspectSnapshot,
+) -> Result<SnapshotInspectionResults> {
     let snapshot_format = if inspect_snapshot.raw_input {
         BiscuitFormat::RawBiscuit
     } else {
@@ -465,8 +525,10 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
     }
 
     let mut authorizer = read_snapshot_from(&snapshot_from)?;
+    let code = authorizer.dump_code();
 
-    println!("{}", authorizer.dump_code());
+    let auth_result;
+    let query_result;
 
     if let Some(auth_from) = authorizer_from {
         read_authorizer_from(
@@ -495,40 +557,37 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
                 .max_time
                 .map_or_else(|| RunLimits::default().max_time, |d| d.to_std().unwrap()),
         });
-
-        match authorizer_result {
-            Ok(i) => {
-                println!("✅ Authorizer check succeeded 🛡️");
-                println!(
-                    "Matched allow policy: {}",
-                    policies.get(i).expect("Incorrect policy index")
-                );
-            }
-
-            Err(e) => {
-                println!("❌ Authorizer check failed 🛡️");
-                match e {
-                    Token::FailedLogic(l) => display_logic_error(
-                        &policies.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
-                        &l,
-                    ),
-                    Token::RunLimit(l) => display_run_limit(&l),
-                    _ => {}
-                }
-            }
-        }
+        auth_result = Some(AuthResult {
+            policies: policies.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
+            result: authorizer_result
+                .map(|i| {
+                    (
+                        i,
+                        policies.get(i).expect("Incorrect policy index").to_string(),
+                    )
+                })
+                .into(),
+        });
+    } else {
+        auth_result = None;
     }
 
     if let Some(query) = &inspect_snapshot.query_args.query {
-        handle_query(
+        query_result = Some(handle_query(
             query,
             inspect_snapshot.query_args.query_all,
             &inspect_snapshot.param_arg.param,
             &mut authorizer,
-        )?;
+        )?);
+    } else {
+        query_result = None;
     }
 
-    Ok(())
+    Ok(SnapshotInspectionResults {
+        code,
+        auth: auth_result,
+        query: query_result,
+    })
 }
 
 fn display_logic_error(policies: &[String], e: &Logic) {
