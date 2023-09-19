@@ -4,6 +4,7 @@
 - internal refactor, fix displayed version number (#46)
 - support for running authorization on a snapshot (#47)
 - biscuit-auth 4.0.0 (#50)
+- JSON output in `biscuit inspect` (#48)
 
 # `0.4.0`
 
