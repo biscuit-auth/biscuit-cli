@@ -8,8 +8,8 @@ use biscuit_auth::{
 use chrono::offset::Utc;
 use serde::Serialize;
 use serde_json::json;
-use std::fs;
 use std::path::PathBuf;
+use std::{fmt::Display, fs};
 
 use crate::cli::*;
 use crate::errors::CliError::*;
@@ -29,34 +29,39 @@ struct TokenDescription {
     blocks: Vec<TokenBlock>,
 }
 
-impl TokenDescription {
-    fn render(&self) {
+impl Display for TokenDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.sealed {
-            println!("Sealed biscuit");
+            writeln!(f, "Sealed biscuit")?;
         } else {
-            println!("Open biscuit");
+            writeln!(f, "Open biscuit")?;
         }
 
         for (i, block) in self.blocks.iter().enumerate() {
             if i == 0 {
                 if let Some(root_key_id) = self.root_key_id {
-                    println!("Authority block (root key identifier: {}):", &root_key_id);
+                    writeln!(
+                        f,
+                        "Authority block (root key identifier: {}):",
+                        &root_key_id
+                    )?;
                 } else {
-                    println!("Authority block:");
+                    writeln!(f, "Authority block:")?;
                 }
             } else if let Some(epk) = &block.external_key {
-                println!("Block n°{}, (third party, signed by {}):", i, epk);
+                writeln!(f, "Block n°{}, (third party, signed by {}):", i, epk)?;
             } else {
-                println!("Block n°{}:", i);
+                writeln!(f, "Block n°{}:", i)?;
             }
 
-            println!("== Datalog ==");
-            println!("{}", block.code);
+            writeln!(f, "== Datalog ==")?;
+            writeln!(f, "{}", block.code)?;
 
-            println!("== Revocation id ==");
-            println!("{}", block.revocation_id);
-            println!("\n==========\n");
+            writeln!(f, "== Revocation id ==")?;
+            writeln!(f, "{}", block.revocation_id)?;
+            writeln!(f, "\n==========\n")?;
         }
+        Ok(())
     }
 }
 
@@ -92,28 +97,29 @@ struct QueryResult {
     facts: RResult<Vec<String>, Token>,
 }
 
-impl QueryResult {
-    fn render(&self) {
-        println!();
+impl Display for QueryResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
         if self.query_all {
-            println!("🔎 Running query on all facts: {}", &self.query);
+            writeln!(f, "🔎 Running query on all facts: {}", &self.query)?;
         } else {
-            println!("🔎 Running query: {}", &self.query);
+            writeln!(f, "🔎 Running query: {}", &self.query)?;
         }
         match &self.facts.clone().into_result() {
             Ok(facts) => {
                 if facts.is_empty() {
-                    println!("❌ No results");
+                    writeln!(f, "❌ No results")?;
                 } else {
                     for fact in facts {
-                        println!("{}", &fact);
+                        writeln!(f, "{}", &fact)?;
                     }
                 }
             }
             Err(_) => {
-                println!("❌ Query failed");
+                writeln!(f, "❌ Query failed")?;
             }
         }
+        Ok(())
     }
 }
 
@@ -123,19 +129,19 @@ struct AuthResult {
     result: RResult<(usize, String), Token>,
 }
 
-impl AuthResult {
-    fn render(&self) {
+impl Display for AuthResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.result.clone().into_result() {
             Ok((_, policy)) => {
-                println!("✅ Authorizer check succeeded 🛡️");
-                println!("Matched allow policy: {}", policy);
+                writeln!(f, "✅ Authorizer check succeeded 🛡️")?;
+                writeln!(f, "Matched allow policy: {}", policy)
             }
             Err(e) => {
-                println!("❌ Authorizer check failed 🛡️");
+                writeln!(f, "❌ Authorizer check failed 🛡️")?;
                 match e {
-                    Token::FailedLogic(l) => display_logic_error(&self.policies, l),
-                    Token::RunLimit(l) => display_run_limit(l),
-                    _ => {}
+                    Token::FailedLogic(l) => display_logic_error(f, &self.policies, l),
+                    Token::RunLimit(l) => display_run_limit(f, l),
+                    _ => Ok(()),
                 }
             }
         }
@@ -150,27 +156,29 @@ pub struct InspectionResults {
     query: Option<QueryResult>,
 }
 
-impl InspectionResults {
-    pub fn render(&self) {
-        self.token.render();
+impl Display for InspectionResults {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.token.fmt(f)?;
 
         match self.signatures_check {
-            None => println!("🙈 Public key check skipped 🔑"),
-            Some(true) => println!("✅ Public key check succeeded 🔑"),
-            Some(false) => println!("❌ Public key check failed 🔑"),
+            None => writeln!(f, "🙈 Public key check skipped 🔑")?,
+            Some(true) => writeln!(f, "✅ Public key check succeeded 🔑")?,
+            Some(false) => writeln!(f, "❌ Public key check failed 🔑")?,
         }
 
         match &self.auth {
-            None => println!("🙈 Datalog check skipped 🛡️"),
-            Some(auth_result) => auth_result.render(),
+            None => writeln!(f, "🙈 Datalog check skipped 🛡️")?,
+            Some(auth_result) => auth_result.fmt(f)?,
         }
 
         match &self.query {
-            None => {}
-            Some(query_result) => query_result.render(),
+            None => Ok(()),
+            Some(query_result) => query_result.fmt(f),
         }
     }
+}
 
+impl InspectionResults {
     pub fn ensure_success(&self) -> Result<()> {
         if self.signatures_check == Some(false) {
             Err(SignaturesCheckFailed)?;
@@ -199,14 +207,15 @@ struct SnapshotDescription {
     elapsed_micros: u128,
 }
 
-impl SnapshotDescription {
-    pub fn render(&self) {
-        println!("{}", self.code);
+impl Display for SnapshotDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.code)?;
 
-        println!(
+        writeln!(
+            f,
             "⏱️ Execution time: {}μs ({} iterations)",
             self.elapsed_micros, self.iterations
-        );
+        )
     }
 }
 
@@ -217,21 +226,23 @@ pub struct SnapshotInspectionResults {
     query: Option<QueryResult>,
 }
 
-impl SnapshotInspectionResults {
-    pub fn render(&self) {
-        self.snapshot.render();
+impl Display for SnapshotInspectionResults {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.snapshot.fmt(f)?;
 
         match &self.auth {
-            None => println!("🙈 Datalog check skipped 🛡️"),
-            Some(auth_result) => auth_result.render(),
+            None => writeln!(f, "🙈 Datalog check skipped 🛡️")?,
+            Some(auth_result) => auth_result.fmt(f)?,
         }
 
         match &self.query {
-            None => {}
-            Some(query_result) => query_result.render(),
+            None => Ok(()),
+            Some(query_result) => query_result.fmt(f),
         }
     }
+}
 
+impl SnapshotInspectionResults {
     pub fn ensure_success(&self) -> Result<()> {
         if let Some(ref auth) = self.auth {
             if auth.result.clone().into_result().is_err() {
@@ -289,7 +300,7 @@ pub fn handle_inspect(inspect: &Inspect) -> Result<()> {
             if inspect.json {
                 println!("{}", serde_json::to_string(&res)?);
             } else {
-                res.render();
+                println!("{}", &res);
             }
             res.ensure_success()
         }
@@ -497,7 +508,7 @@ pub fn handle_inspect_snapshot(inspect_snapshot: &InspectSnapshot) -> Result<()>
             if inspect_snapshot.json {
                 println!("{}", serde_json::to_string(&res)?);
             } else {
-                res.render();
+                println!("{}", &res);
             }
             res.ensure_success()
         }
@@ -612,42 +623,59 @@ pub fn handle_inspect_snapshot_inner(
     })
 }
 
-fn display_logic_error(policies: &[String], e: &Logic) {
+fn display_logic_error(
+    f: &mut std::fmt::Formatter<'_>,
+    policies: &[String],
+    e: &Logic,
+) -> std::fmt::Result {
     match e {
         Logic::Unauthorized { policy, checks } => {
-            display_matched_policy(policies, policy);
-            display_failed_checks(checks);
+            display_matched_policy(f, policies, policy)?;
+            display_failed_checks(f, checks)
         }
         Logic::NoMatchingPolicy { checks } => {
-            println!("No policy matched");
-            display_failed_checks(checks);
+            writeln!(f, "No policy matched")?;
+            display_failed_checks(f, checks)
         }
-        e => println!("An execution error happened during authorization: {:?}", &e),
+        e => writeln!(
+            f,
+            "An execution error happened during authorization: {:?}",
+            &e
+        ),
     }
 }
 
-fn display_matched_policy(policies: &[String], policy: &MatchedPolicy) {
+fn display_matched_policy(
+    f: &mut std::fmt::Formatter<'_>,
+    policies: &[String],
+    policy: &MatchedPolicy,
+) -> std::fmt::Result {
     match policy {
         MatchedPolicy::Allow(i) => {
             let policy = policies.get(*i);
-            println!(
+            writeln!(
+                f,
                 "An allow policy matched: {}",
                 policy.expect("Incorrect policy index")
-            );
+            )
         }
         MatchedPolicy::Deny(i) => {
             let policy = policies.get(*i);
-            println!(
+            writeln!(
+                f,
                 "A deny policy matched: {}",
                 policy.expect("Incorrect policy index")
-            );
+            )
         }
     }
 }
 
-fn display_failed_checks(checks: &Vec<FailedCheck>) {
+fn display_failed_checks(
+    f: &mut std::fmt::Formatter<'_>,
+    checks: &Vec<FailedCheck>,
+) -> std::fmt::Result {
     if !checks.is_empty() {
-        println!("The following checks failed:");
+        writeln!(f, "The following checks failed:")?;
     }
     for c in checks {
         match c {
@@ -657,15 +685,20 @@ fn display_failed_checks(checks: &Vec<FailedCheck>) {
                 } else {
                     format!("Block {}", &bc.block_id)
                 };
-                println!("  {} check: {}", &block_name, &bc.rule);
+                writeln!(f, "  {} check: {}", &block_name, &bc.rule)?;
             }
-            FailedCheck::Authorizer(ac) => println!("  Authorizer check: {}", &ac.rule),
+            FailedCheck::Authorizer(ac) => writeln!(f, "  Authorizer check: {}", &ac.rule)?,
         }
     }
+    Ok(())
 }
 
-fn display_run_limit(e: &RunLimit) {
-    println!("The authorizer execution was aborted: {}", &e.to_string());
+fn display_run_limit(f: &mut std::fmt::Formatter<'_>, e: &RunLimit) -> std::fmt::Result {
+    writeln!(
+        f,
+        "The authorizer execution was aborted: {}",
+        &e.to_string()
+    )
 }
 
 fn is_sealed(b: &UnverifiedBiscuit) -> Result<bool> {
