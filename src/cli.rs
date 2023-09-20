@@ -159,6 +159,9 @@ pub struct Inspect {
 /// Inspect a snapshot
 #[derive(Parser)]
 pub struct InspectSnapshot {
+    /// Output the results in a machine-readable format
+    #[clap(long)]
+    pub json: bool,
     /// Read the snapshot from the given file (or use `-` to read from stdin)
     #[clap(parse(from_os_str))]
     pub snapshot_file: PathBuf,
