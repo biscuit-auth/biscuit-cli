@@ -1,10 +1,11 @@
-# `0.4.1` (not released yet)
+# `0.4.1`
 
 - support for querying authorizers and snapshots (#45)
 - internal refactor, fix displayed version number (#46)
 - support for running authorization on a snapshot (#47)
 - biscuit-auth 4.0.0 (#50)
 - JSON output in `biscuit inspect` (#48)
+- JSON output in `biscuit inspect-snapshot` (#51)
 
 # `0.4.0`
 
