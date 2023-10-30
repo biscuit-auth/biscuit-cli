@@ -8,8 +8,8 @@ use biscuit_auth::{
 use chrono::offset::Utc;
 use serde::Serialize;
 use serde_json::json;
-use std::path::PathBuf;
 use std::{fmt::Display, fs};
+use std::{path::PathBuf, time::Duration};
 
 use crate::cli::*;
 use crate::errors::CliError::*;
@@ -127,17 +127,29 @@ impl Display for QueryResult {
 struct AuthResult {
     policies: Vec<String>,
     result: RResult<(usize, String), Token>,
+    iterations: u64,
+    elapsed: Duration,
 }
 
 impl Display for AuthResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.result.clone().into_result() {
             Ok((_, policy)) => {
-                writeln!(f, "✅ Authorizer check succeeded 🛡️")?;
+                writeln!(
+                    f,
+                    "✅ Authorizer check succeeded 🛡️ ({}μs, {} iterations)",
+                    self.elapsed.as_micros(),
+                    self.iterations,
+                )?;
                 writeln!(f, "Matched allow policy: {}", policy)
             }
             Err(e) => {
-                writeln!(f, "❌ Authorizer check failed 🛡️")?;
+                writeln!(
+                    f,
+                    "❌ Authorizer check failed 🛡️ ({}μs, {} iterations)",
+                    self.elapsed.as_micros(),
+                    self.iterations,
+                )?;
                 match e {
                     Token::FailedLogic(l) => display_logic_error(f, &self.policies, l),
                     Token::RunLimit(l) => display_run_limit(f, l),
@@ -445,6 +457,8 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
                             )
                         })
                         .into(),
+                    iterations: authorizer_builder.iterations(),
+                    elapsed: authorizer_builder.execution_time(),
                 });
 
                 if let Some(snapshot_file) = &inspect.dump_snapshot_to {
@@ -600,6 +614,8 @@ pub fn handle_inspect_snapshot_inner(
                     )
                 })
                 .into(),
+            iterations: authorizer.iterations(),
+            elapsed: authorizer.execution_time(),
         });
     } else {
         auth_result = None;
