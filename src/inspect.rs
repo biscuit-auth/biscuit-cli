@@ -555,7 +555,7 @@ pub fn handle_inspect_snapshot_inner(
 
     let mut authorizer = read_snapshot_from(&snapshot_from)?;
     let snapshot_description = SnapshotDescription {
-        code: authorizer.dump_code(),
+        code: authorizer.to_string(),
         iterations: authorizer.iterations(),
         elapsed_micros: authorizer.execution_time().as_micros(),
     };
