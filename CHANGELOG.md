@@ -1,3 +1,9 @@
+# `0.4.2`
+
+- display evaluation time & iterations (#54)
+- biscuit-auth 4.1.1 (better authorizer contents listing) (#55)
+- `nix develop` support for local dev (#56) (er4hn)
+
 # `0.4.1`
 
 - support for querying authorizers and snapshots (#45)
