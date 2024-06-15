@@ -1,8 +1,8 @@
 use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
-    builder::{BiscuitBuilder, BlockBuilder, Rule, Term},
-    Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
+    builder::{Algorithm, BiscuitBuilder, BlockBuilder, Rule, Term},
+    Authorizer, PrivateKey, PublicKey, ThirdPartyRequest, UnverifiedBiscuit,
 };
 use chrono::{DateTime, Duration, Utc};
 use parse_duration as duration_parser;
@@ -230,7 +230,7 @@ pub fn read_authorizer_from(
     Ok(())
 }
 
-pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
+pub fn read_private_key_from(from: &KeyBytes, algorithm: Algorithm) -> Result<PrivateKey> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
@@ -246,11 +246,11 @@ pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
         )?,
         KeyBytes::HexString(str) => hex::decode(str)?,
     };
-    PrivateKey::from_bytes(&bytes)
+    PrivateKey::from_bytes(&bytes, algorithm)
         .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)).into())
 }
 
-pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
+pub fn read_public_key_from(from: &KeyBytes, algorithm: Algorithm) -> Result<PublicKey> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
@@ -266,7 +266,7 @@ pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
         )?,
         KeyBytes::HexString(str) => hex::decode(str)?,
     };
-    PublicKey::from_bytes(&bytes)
+    PublicKey::from_bytes(&bytes, algorithm)
         .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)).into())
 }
 
@@ -418,13 +418,19 @@ pub fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
 
     match annotation {
       Some("pubkey") => {
-        let hex_key = value.strip_prefix("ed25519/").ok_or_else(|| Error::new(
-        ErrorKind::Other,
-        "Unsupported public key type. Only hex-encoded ed25519 public keys are supported. They must start with `ed25519/`.",
-        ))?;
+        let (algorithm, hex_key)= if let Some(hex_key) = value.strip_prefix("ed25519/") {
+            (Algorithm::Ed25519, hex_key)
+        } else if let Some(hex_key) = value.strip_prefix("secp256r1/") {
+            (Algorithm::Secp256r1, hex_key)
+        } else {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Unsupported public key type. Only hex-encoded ed25519 or secp256r1 public keys are supported. They must start with `ed25519/` or `secp256r1/`",
+                ));
+        };
         let bytes =
             hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
-        let pubkey = PublicKey::from_bytes(&bytes?)
+        let pubkey = PublicKey::from_bytes(&bytes?, algorithm)
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::PublicKey(name.to_string(), pubkey))
       },
