@@ -1,6 +1,6 @@
 use anyhow::Result;
 use biscuit_auth::{
-    builder::{Fact, Rule},
+    builder::{Algorithm, Fact, Rule},
     datalog::RunLimits,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
     Authorizer, UnverifiedBiscuit,
@@ -11,9 +11,8 @@ use serde_json::json;
 use std::{fmt::Display, fs};
 use std::{path::PathBuf, time::Duration};
 
-use crate::cli::*;
-use crate::errors::CliError::*;
 use crate::input::*;
+use crate::{cli, errors::CliError::*, Inspect, InspectSnapshot};
 
 #[derive(Serialize)]
 struct TokenBlock {
@@ -413,7 +412,13 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
     let query_result;
 
     if let Some(key_from) = public_key_from {
-        let key = read_public_key_from(&key_from)?;
+        let algorithm = match inspect.algorithm {
+            Some(cli::Algorithm::Ed25519) => Algorithm::Ed25519,
+            Some(cli::Algorithm::Secp256r1) => Algorithm::Secp256r1,
+            None => Algorithm::Ed25519,
+        };
+
+        let key = read_public_key_from(&key_from, algorithm)?;
         let sig_result = biscuit.check_signature(|_| key);
         signatures_check = Some(sig_result.is_ok());
 

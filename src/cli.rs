@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 use crate::input::*;
@@ -49,6 +49,16 @@ pub struct KeyPairCmd {
     /// Output the private key raw bytes directly, with no hex encoding
     #[clap(long, requires("only-private-key"))]
     pub raw_private_key_output: bool,
+    /// Key pair cryptographic algorithm
+    #[clap(subcommand)]
+    pub algorithm: Algorithm,
+}
+
+/// Cryptographic algorithm for block signature
+#[derive(Subcommand)]
+pub enum Algorithm {
+    Ed25519,
+    Secp256r1,
 }
 
 /// Generate a biscuit from a private key and an authority block
@@ -85,6 +95,9 @@ pub struct Generate {
     /// Add a TTL check to the generated authority block (either a RFC3339 datetime or a duration like '1d')
     #[clap(long, parse(try_from_str = parse_ttl))]
     pub add_ttl: Option<Ttl>,
+    /// Key pair cryptographic algorithm
+    #[clap(subcommand)]
+    pub algorithm: Algorithm,
 }
 
 /// Attenuate an existing biscuit by adding a new block
@@ -99,6 +112,9 @@ pub struct Attenuate {
     pub block_args: common_args::BlockArgs,
     #[clap(flatten)]
     pub param_arg: common_args::ParamArg,
+    /// Key pair cryptographic algorithm
+    #[clap(subcommand)]
+    pub algorithm: Option<Algorithm>,
 }
 
 /// Attenuate an existing biscuit by adding a new third-party block
@@ -154,6 +170,9 @@ pub struct Inspect {
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
+    /// Key pair cryptographic algorithm
+    #[clap(subcommand)]
+    pub algorithm: Option<Algorithm>,
 }
 
 /// Inspect a snapshot
@@ -216,6 +235,9 @@ pub struct GenerateThirdPartyBlock {
     pub block_args: common_args::BlockArgs,
     #[clap(flatten)]
     pub param_arg: common_args::ParamArg,
+    /// Key pair cryptographic algorithm
+    #[clap(subcommand)]
+    pub algorithm: Algorithm,
 }
 
 /// Seal a token, preventing further attenuation
