@@ -1,3 +1,7 @@
+# `0.5.0`
+
+- biscuit-auth 5.0.0
+
 # `0.4.2`
 
 - display evaluation time & iterations (#54)
