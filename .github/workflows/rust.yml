@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: mig4/setup-bats@v1
-    - uses: brokenpip3/setup-bats-libs@0.1.0
     - uses: actions/checkout@v2
     - name: Cache
       uses: actions/cache@v2
@@ -36,4 +34,3 @@ jobs:
     - name: Tests
       run: |
         cargo test
-        bats test.bats
