@@ -414,7 +414,7 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
 
     if let Some(key_from) = public_key_from {
         let key = read_public_key_from(&key_from)?;
-        let sig_result = biscuit.check_signature(|_| key);
+        let sig_result = biscuit.verify(key);
         signatures_check = Some(sig_result.is_ok());
 
         if let Ok(biscuit) = sig_result {
