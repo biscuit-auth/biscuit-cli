@@ -351,3 +351,9 @@ mod common_args {
         pub raw_input: bool,
     }
 }
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Opts::command().debug_assert();
+}

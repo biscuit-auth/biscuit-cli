@@ -145,21 +145,3 @@ cargo fmt --check
 # CI ensures that there are no outstanding clippy hints
 cargo clippy
 ```
-
-### Integration tests
-
-To run integration tests locally, you will need `bats`. For now, only installation through `brew` and github actions is supported (`bats` needs to load its modules manually, and their installation path depends how they were installed). Feel free to add support for more systems as needed.
-
-```sh
-bats test.bats
-```
-
-<details>
-<summary>Installation with brew</summary>
-```sh
-brew install bats-core
-brew tap kaos/shell
-brew install bats-assert
-brew install bats-file
-```
-</details>
