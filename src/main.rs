@@ -62,7 +62,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     };
 
     let private_key: Option<PrivateKey> = if let Some(f) = private_key_from {
-        Some(read_private_key_from(f)?)
+        Some(read_private_key_from(f, key_pair_cmd.key_algorithm)?)
     } else {
         None
     };
@@ -70,7 +70,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     let key_pair = if let Some(private) = private_key {
         KeyPair::from(&private)
     } else {
-        KeyPair::new()
+        KeyPair::new_with_algorithm(key_pair_cmd.key_algorithm)
     };
 
     match (
@@ -116,32 +116,35 @@ fn handle_generate(generate: &Generate) -> Result<()> {
         None => DatalogInput::FromEditor,
     };
 
-    let private_key: Result<PrivateKey> = read_private_key_from(&match (
-        &generate.private_key,
-        &generate.private_key_file,
-        &generate.raw_private_key,
-    ) {
-        (Some(hex_string), None, false) => KeyBytes::HexString(hex_string.to_owned()),
-        (None, Some(file), true) => KeyBytes::FromFile(KeyFormat::RawBytes, file.to_path_buf()),
-        (None, Some(file), false) => KeyBytes::FromFile(KeyFormat::HexKey, file.to_path_buf()),
-        // the other combinations are prevented by clap
-        _ => unreachable!(),
-    });
+    let private_key: Result<PrivateKey> = read_private_key_from(
+        &match (
+            &generate.private_key,
+            &generate.private_key_file,
+            &generate.raw_private_key,
+        ) {
+            (Some(hex_string), None, false) => KeyBytes::HexString(hex_string.to_owned()),
+            (None, Some(file), true) => KeyBytes::FromFile(KeyFormat::RawBytes, file.to_path_buf()),
+            (None, Some(file), false) => KeyBytes::FromFile(KeyFormat::HexKey, file.to_path_buf()),
+            // the other combinations are prevented by clap
+            _ => unreachable!(),
+        },
+        generate.key_algorithm,
+    );
 
     let root = KeyPair::from(&private_key?);
     let mut builder = Biscuit::builder();
-    read_authority_from(
+    builder = read_authority_from(
         &authority_from,
         &generate.param_arg.param,
         &generate.context,
-        &mut builder,
+        builder,
     )?;
 
     if let Some(ttl) = &generate.add_ttl {
-        builder.check_expiration_date(ttl.to_datetime().into());
+        builder = builder.check_expiration_date(ttl.to_datetime().into());
     }
     if let Some(root_key_id) = &generate.root_key_id {
-        builder.set_root_key_id(*root_key_id);
+        builder = builder.root_key_id(*root_key_id);
     }
     let biscuit = builder.build(&root).expect("Error building biscuit"); // todo display error
     let encoded = if generate.raw {
@@ -188,15 +191,15 @@ fn handle_attenuate(attenuate: &Attenuate) -> Result<()> {
     let biscuit = read_biscuit_from(&biscuit_from)?;
     let mut block_builder = BlockBuilder::new();
 
-    read_block_from(
+    block_builder = read_block_from(
         &block_from,
         &attenuate.param_arg.param,
         &attenuate.block_args.context,
-        &mut block_builder,
+        block_builder,
     )?;
 
     if let Some(ttl) = &attenuate.block_args.add_ttl {
-        block_builder.check_expiration_date(ttl.to_datetime().into());
+        block_builder = block_builder.check_expiration_date(ttl.to_datetime().into());
     }
 
     let new_biscuit = biscuit.append(block_builder)?;
@@ -269,30 +272,33 @@ fn handle_generate_third_party_block(
 
     ensure_no_input_conflict(&block_from, &request_from)?;
 
-    let private_key: Result<PrivateKey> = read_private_key_from(&match (
-        &generate_third_party_block.private_key,
-        &generate_third_party_block.private_key_file,
-        &generate_third_party_block.raw_private_key,
-    ) {
-        (Some(hex_string), None, false) => KeyBytes::HexString(hex_string.to_owned()),
-        (None, Some(file), true) => KeyBytes::FromFile(KeyFormat::RawBytes, file.to_path_buf()),
-        (None, Some(file), false) => KeyBytes::FromFile(KeyFormat::HexKey, file.to_path_buf()),
-        // the other combinations are prevented by clap
-        _ => unreachable!(),
-    });
+    let private_key: Result<PrivateKey> = read_private_key_from(
+        &match (
+            &generate_third_party_block.private_key,
+            &generate_third_party_block.private_key_file,
+            &generate_third_party_block.raw_private_key,
+        ) {
+            (Some(hex_string), None, false) => KeyBytes::HexString(hex_string.to_owned()),
+            (None, Some(file), true) => KeyBytes::FromFile(KeyFormat::RawBytes, file.to_path_buf()),
+            (None, Some(file), false) => KeyBytes::FromFile(KeyFormat::HexKey, file.to_path_buf()),
+            // the other combinations are prevented by clap
+            _ => unreachable!(),
+        },
+        generate_third_party_block.key_algorithm,
+    );
 
     let request = read_request_from(&request_from)?;
 
     let mut builder = BlockBuilder::new();
-    read_block_from(
+    builder = read_block_from(
         &block_from,
         &generate_third_party_block.param_arg.param,
         &generate_third_party_block.block_args.context,
-        &mut builder,
+        builder,
     )?;
 
     if let Some(ttl) = &generate_third_party_block.block_args.add_ttl {
-        builder.check_expiration_date(ttl.to_datetime().into());
+        builder = builder.check_expiration_date(ttl.to_datetime().into());
     }
 
     let block = request.create_block(&private_key?, builder)?;

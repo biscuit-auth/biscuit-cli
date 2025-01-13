@@ -27,6 +27,8 @@ pub enum CliError {
     MissingPublicKeyForQuerying,
     #[error("Signatures check failed")]
     SignaturesCheckFailed,
+    #[error("Datalog fact generation failed")]
+    EvaluationFailed,
     #[error("Authorization failed")]
     AuthorizationFailed,
     #[error("Querying failed")]

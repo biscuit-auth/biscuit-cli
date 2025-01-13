@@ -1,3 +1,4 @@
+use biscuit_auth::Algorithm;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -49,6 +50,9 @@ pub struct KeyPairCmd {
     /// Output the private key raw bytes directly, with no hex encoding
     #[clap(long, requires("only-private-key"))]
     pub raw_private_key_output: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long, default_value_t)]
+    pub key_algorithm: Algorithm,
 }
 
 /// Generate a biscuit from a private key and an authority block
@@ -79,6 +83,9 @@ pub struct Generate {
     /// Read the private key raw bytes directly (only available when reading the private key from a file)
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long, default_value_t)]
+    pub key_algorithm: Algorithm,
     /// The optional context string attached to the authority block
     #[clap(long)]
     pub context: Option<String>,
@@ -142,6 +149,11 @@ pub struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     pub raw_public_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long, default_value_t)]
+    pub key_algorithm: Algorithm,
+    #[clap(flatten)]
+    pub run_limits_args: common_args::RunLimitArgs,
     #[clap(flatten)]
     pub authorization_args: common_args::AuthorizeArgs,
     #[clap(flatten)]
@@ -169,7 +181,7 @@ pub struct InspectSnapshot {
     #[clap(long)]
     pub raw_input: bool,
     #[clap(flatten)]
-    pub authorization_args: common_args::AuthorizeArgs,
+    pub run_limits_args: common_args::RunLimitArgs,
     #[clap(flatten)]
     pub query_args: common_args::QueryArgs,
     #[clap(flatten)]
@@ -209,6 +221,9 @@ pub struct GenerateThirdPartyBlock {
     /// Read the private key raw bytes directly (only available when reading the private key from a file)
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long, default_value_t)]
+    pub key_algorithm: Algorithm,
     /// Output the block raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
@@ -254,13 +269,32 @@ mod common_args {
     pub struct ParamArg {
         /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
         /// Bytes values must be hex-encoded and start with `hex:`
-        /// Public keys must be hex-encoded and start with `ed25519/`
+        /// Public keys must be hex-encoded and start with `ed25519/` or `secp256r1/`
         #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
         value_name = "key[:type]=value"
     )]
         pub param: Vec<Param>,
+    }
+
+    /// Arguments related to runtime limits
+    #[derive(Parser)]
+    pub struct RunLimitArgs {
+        /// Configure the maximum amount of facts that can be generated
+        /// before aborting evaluation
+        #[clap(long)]
+        pub max_facts: Option<u64>,
+        /// Configure the maximum amount of iterations before aborting
+        /// evaluation
+        #[clap(long)]
+        pub max_iterations: Option<u64>,
+        /// Configure the maximum evaluation duration before aborting
+        #[clap(
+            long,
+            parse(try_from_str = parse_duration)
+        )]
+        pub max_time: Option<Duration>,
     }
 
     /// Arguments related to running authorization
@@ -291,33 +325,6 @@ mod common_args {
             conflicts_with("authorize-interactive")
         )]
         pub authorize_with: Option<String>,
-        /// Configure the maximum amount of facts that can be generated
-        /// before aborting evaluation
-        #[clap(
-            long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file")
-        )]
-        pub max_facts: Option<u64>,
-        /// Configure the maximum amount of iterations before aborting
-        /// evaluation
-        #[clap(
-            long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file")
-        )]
-        pub max_iterations: Option<u64>,
-        /// Configure the maximum evaluation duration before aborting
-        #[clap(
-            long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file"),
-            parse(try_from_str = parse_duration)
-        )]
-        pub max_time: Option<Duration>,
         /// Include the current time in the verifier facts
         #[clap(long)]
         pub include_time: bool,

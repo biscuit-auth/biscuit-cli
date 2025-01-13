@@ -2,7 +2,8 @@ use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder, Rule, Term},
-    Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
+    Algorithm, Authorizer, AuthorizerBuilder, PrivateKey, PublicKey, ThirdPartyRequest,
+    UnverifiedBiscuit,
 };
 use chrono::{DateTime, Duration, Utc};
 use parse_duration as duration_parser;
@@ -131,8 +132,8 @@ pub fn read_authority_from(
     from: &DatalogInput,
     all_params: &[Param],
     context: &Option<String>,
-    builder: &mut BiscuitBuilder,
-) -> Result<()> {
+    builder: BiscuitBuilder,
+) -> Result<BiscuitBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -153,22 +154,22 @@ pub fn read_authority_from(
         }
     }
 
-    builder
-        .add_code_with_params(&string, params, scope_params)
+    let mut builder = builder
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
     if let Some(ctx) = context {
-        builder.set_context(ctx.to_owned());
+        builder = builder.context(ctx.to_owned());
     }
 
-    Ok(())
+    Ok(builder)
 }
 
 pub fn read_block_from(
     from: &DatalogInput,
     all_params: &[Param],
     context: &Option<String>,
-    builder: &mut BlockBuilder,
-) -> Result<()> {
+    builder: BlockBuilder,
+) -> Result<BlockBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -188,22 +189,22 @@ pub fn read_block_from(
             }
         }
     }
-    builder
-        .add_code_with_params(&string, params, scope_params)
+    let mut builder = builder
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
     if let Some(ctx) = context {
-        builder.set_context(ctx.to_owned());
+        builder = builder.context(ctx.to_owned());
     }
 
-    Ok(())
+    Ok(builder)
 }
 
 pub fn read_authorizer_from(
     from: &DatalogInput,
     all_params: &[Param],
-    authorizer: &mut Authorizer,
-) -> Result<()> {
+    builder: AuthorizerBuilder,
+) -> Result<AuthorizerBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -223,14 +224,14 @@ pub fn read_authorizer_from(
             }
         }
     }
-    authorizer
-        .add_code_with_params(&string, params, scope_params)
+    let builder = builder
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
-    Ok(())
+    Ok(builder)
 }
 
-pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
+pub fn read_private_key_from(from: &KeyBytes, alg: Algorithm) -> Result<PrivateKey> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
@@ -246,11 +247,11 @@ pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
         )?,
         KeyBytes::HexString(str) => hex::decode(str)?,
     };
-    PrivateKey::from_bytes(&bytes)
+    PrivateKey::from_bytes(&bytes, alg)
         .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)).into())
 }
 
-pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
+pub fn read_public_key_from(from: &KeyBytes, alg: Algorithm) -> Result<PublicKey> {
     let bytes = match from {
         KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
@@ -266,7 +267,7 @@ pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
         )?,
         KeyBytes::HexString(str) => hex::decode(str)?,
     };
-    PublicKey::from_bytes(&bytes)
+    PublicKey::from_bytes(&bytes, alg)
         .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)).into())
 }
 
@@ -424,7 +425,7 @@ pub fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         ))?;
         let bytes =
             hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
-        let pubkey = PublicKey::from_bytes(&bytes?)
+        let pubkey = PublicKey::from_bytes(&bytes?, Algorithm::Ed25519)
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::PublicKey(name.to_string(), pubkey))
       },
