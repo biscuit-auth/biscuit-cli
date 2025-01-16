@@ -16,8 +16,8 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "keypair")]
     KeyPairCmd(KeyPairCmd),
-    Inspect(Inspect),
-    InspectSnapshot(InspectSnapshot),
+    Inspect(Box<Inspect>),
+    InspectSnapshot(Box<InspectSnapshot>),
     Generate(Generate),
     Attenuate(Attenuate),
     GenerateRequest(GenerateRequest),
@@ -166,6 +166,12 @@ pub struct Inspect {
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
+    /// Save an authorizer builder snapshot to a file
+    #[clap(long, parse(from_os_str))]
+    pub dump_policies_snapshot_to: Option<PathBuf>,
+    /// Output the snapshot raw bytes directly, with no base64 encoding
+    #[clap(long, requires("dump-snapshot-to"))]
+    pub dump_raw_raw_policies_snapshot: bool,
 }
 
 /// Inspect a snapshot
@@ -305,7 +311,9 @@ mod common_args {
             long,
             alias("verify-interactive"),
             conflicts_with("authorize-with"),
-            conflicts_with("authorize-with-file")
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file")
         )]
         pub authorize_interactive: bool,
         /// Authorize the biscuit with the provided authorizer.
@@ -314,6 +322,8 @@ mod common_args {
             parse(from_os_str),
             alias("verify-with-file"),
             conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file"),
             conflicts_with("authorize-interactive")
         )]
         pub authorize_with_file: Option<PathBuf>,
@@ -322,9 +332,34 @@ mod common_args {
             long,
             alias("verify-with"),
             conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file"),
             conflicts_with("authorize-interactive")
         )]
         pub authorize_with: Option<String>,
+        /// Authorize the biscuit with the provided snapshot
+        /// The snapshot must not be evaluated
+        #[clap(
+            long,
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot-file"),
+            conflicts_with("authorize-interactive")
+        )]
+        pub authorize_with_snapshot: Option<String>,
+        /// Authorize the biscuit with the provided snapshot
+        /// The snapshot must not be evaluated
+        #[clap(
+            long,
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-interactive")
+        )]
+        pub authorize_with_snapshot_file: Option<PathBuf>,
+        /// Read the snapshot from a binary file
+        #[clap(long, requires("authorize-with-snapshot-file"))]
+        pub authorize_with_raw_snapshot_file: bool,
         /// Include the current time in the verifier facts
         #[clap(long)]
         pub include_time: bool,

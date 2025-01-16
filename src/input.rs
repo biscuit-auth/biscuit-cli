@@ -51,6 +51,16 @@ pub enum DatalogInput {
     DatalogString(String),
 }
 
+pub enum AuthorizerInput {
+    FromDatalog(DatalogInput, Vec<Param>),
+    FromSnapshot(SnapshotInput),
+}
+
+pub enum SnapshotInput {
+    FromFile(PathBuf, BiscuitFormat),
+    FromString(String),
+}
+
 pub fn ensure_no_input_conflict(datalog: &DatalogInput, biscuit: &BiscuitBytes) -> Result<()> {
     match (datalog, biscuit) {
         // running $EDITOR as a child process requires a working stdin. When contents from stdin has already been read, this is
@@ -200,10 +210,18 @@ pub fn read_block_from(
     Ok(builder)
 }
 
-pub fn read_authorizer_from(
+pub fn read_authorizer_from(from: &AuthorizerInput) -> Result<AuthorizerBuilder> {
+    match from {
+        AuthorizerInput::FromDatalog(datalog, all_params) => {
+            read_authorizer_from_datalog(datalog, all_params)
+        }
+        AuthorizerInput::FromSnapshot(snapshot) => read_authorizer_from_snapshot(snapshot),
+    }
+}
+
+pub fn read_authorizer_from_datalog(
     from: &DatalogInput,
     all_params: &[Param],
-    builder: AuthorizerBuilder,
 ) -> Result<AuthorizerBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
@@ -224,10 +242,31 @@ pub fn read_authorizer_from(
             }
         }
     }
-    let builder = builder
+    let builder = AuthorizerBuilder::new()
         .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
+    Ok(builder)
+}
+
+fn read_authorizer_from_snapshot(
+    snapshot: &SnapshotInput,
+) -> std::result::Result<AuthorizerBuilder, anyhow::Error> {
+    let builder = match snapshot {
+        SnapshotInput::FromFile(path, BiscuitFormat::RawBiscuit) => {
+            AuthorizerBuilder::from_raw_snapshot(
+                &fs::read(path).map_err(|_| FileNotFound(path.clone()))?,
+            )?
+        }
+        SnapshotInput::FromFile(path, BiscuitFormat::Base64Biscuit) => {
+            AuthorizerBuilder::from_base64_snapshot(
+                fs::read_to_string(path)
+                    .map_err(|_| FileNotFound(path.clone()))?
+                    .trim(),
+            )?
+        }
+        SnapshotInput::FromString(str) => AuthorizerBuilder::from_base64_snapshot(str)?,
+    };
     Ok(builder)
 }
 

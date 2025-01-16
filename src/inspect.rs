@@ -3,7 +3,7 @@ use biscuit_auth::{
     builder::{Fact, Rule},
     datalog::RunLimits,
     error::{FailedCheck, Logic, MatchedPolicy, RunLimit, Token},
-    Authorizer, AuthorizerBuilder, UnverifiedBiscuit,
+    Authorizer, UnverifiedBiscuit,
 };
 use chrono::offset::Utc;
 use serde::Serialize;
@@ -412,17 +412,41 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
         &inspect.authorization_args.authorize_interactive,
         &inspect.authorization_args.authorize_with,
         &inspect.authorization_args.authorize_with_file,
+        &inspect.authorization_args.authorize_with_snapshot,
+        &inspect.authorization_args.authorize_with_snapshot_file,
     ) {
-        (false, None, None) => None,
-        (true, None, None) => Some(DatalogInput::FromEditor),
-        (false, Some(str), None) => Some(DatalogInput::DatalogString(str.to_owned())),
-        (false, None, Some(path)) => Some(DatalogInput::FromFile(path.to_path_buf())),
+        (false, None, None, None, None) => None,
+        (true, None, None, None, None) => Some(AuthorizerInput::FromDatalog(
+            DatalogInput::FromEditor,
+            inspect.param_arg.param.clone(),
+        )),
+        (false, Some(str), None, None, None) => Some(AuthorizerInput::FromDatalog(
+            DatalogInput::DatalogString(str.to_owned()),
+            inspect.param_arg.param.clone(),
+        )),
+        (false, None, Some(path), None, None) => Some(AuthorizerInput::FromDatalog(
+            DatalogInput::FromFile(path.to_path_buf()),
+            inspect.param_arg.param.clone(),
+        )),
+        (false, None, None, Some(str), None) => Some(AuthorizerInput::FromSnapshot(
+            SnapshotInput::FromString(str.to_owned()),
+        )),
+        (false, None, None, None, Some(path)) => {
+            Some(AuthorizerInput::FromSnapshot(SnapshotInput::FromFile(
+                path.to_path_buf(),
+                if inspect.authorization_args.authorize_with_raw_snapshot_file {
+                    BiscuitFormat::RawBiscuit
+                } else {
+                    BiscuitFormat::Base64Biscuit
+                },
+            )))
+        }
         // the other combinations are prevented by clap
         _ => unreachable!(),
     };
 
-    if let Some(vf) = &authorizer_from {
-        ensure_no_input_conflict(vf, &biscuit_from)?;
+    if let Some(AuthorizerInput::FromDatalog(dlf, _)) = &authorizer_from {
+        ensure_no_input_conflict(dlf, &biscuit_from)?;
     }
 
     if inspect.query_args.query.is_some() && public_key_from.is_none() {
@@ -467,15 +491,24 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
         signatures_check = Some(sig_result.is_ok());
 
         if let Ok(biscuit) = sig_result {
-            let mut authorizer_builder = AuthorizerBuilder::new();
+            let mut authorizer_builder;
             if let Some(auth_from) = authorizer_from {
-                authorizer_builder =
-                    read_authorizer_from(&auth_from, &inspect.param_arg.param, authorizer_builder)?;
+                authorizer_builder = read_authorizer_from(&auth_from)?;
                 if inspect.authorization_args.include_time {
                     let now = Utc::now().to_rfc3339();
                     let time_fact = format!("time({})", now);
                     authorizer_builder = authorizer_builder.fact(time_fact.as_ref())?;
                 }
+                if let Some(policies_snapshot_file) = &inspect.dump_policies_snapshot_to {
+                    if inspect.dump_raw_raw_policies_snapshot {
+                        let bytes = authorizer_builder.to_raw_snapshot()?;
+                        fs::write(policies_snapshot_file, bytes)?;
+                    } else {
+                        let str = authorizer_builder.to_base64_snapshot()?;
+                        fs::write(policies_snapshot_file, str)?;
+                    }
+                }
+
                 let mut authorizer = authorizer_builder.build(&biscuit)?;
                 let (_, _, _, policies) = authorizer.dump();
 
