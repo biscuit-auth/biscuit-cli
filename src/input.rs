@@ -270,44 +270,84 @@ fn read_authorizer_from_snapshot(
     Ok(builder)
 }
 
-pub fn read_private_key_from(from: &KeyBytes, alg: Algorithm) -> Result<PrivateKey> {
-    let bytes = match from {
-        KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
+pub fn read_private_key_from(from: &KeyBytes, alg: &Option<Algorithm>) -> Result<PrivateKey> {
+    let key = match from {
+        KeyBytes::FromStdin(KeyFormat::RawBytes) => {
+            let bytes = read_stdin_bytes()?;
+            PrivateKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
+        }
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string("hex-encoded private key")?)?
+            let str = read_stdin_string("hex-encoded private key")?;
+            str.parse()
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
+            let bytes = fs::read(path).map_err(|_| FileNotFound(path.clone()))?;
+            PrivateKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
         }
-        KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(path)
-                .map_err(|_| FileNotFound(path.clone()))?
-                .trim(),
-        )?,
-        KeyBytes::HexString(str) => hex::decode(str)?,
+        KeyBytes::FromFile(KeyFormat::HexKey, path) => {
+            let str = fs::read_to_string(path).map_err(|_| FileNotFound(path.clone()))?;
+            str.parse()
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::HexString(str) => str
+            .parse()
+            .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?,
     };
-    PrivateKey::from_bytes(&bytes, alg)
-        .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)).into())
+    let key_alg = key.algorithm().into();
+
+    if let Some(a) = alg {
+        if *a != key_alg {
+            Err(std::io::Error::other(format!(
+                "Inconsistent algorithm: key algorithm is {}, expected algorithm is {}",
+                key_alg, a
+            )))?
+        }
+    }
+
+    Ok(key)
 }
 
-pub fn read_public_key_from(from: &KeyBytes, alg: Algorithm) -> Result<PublicKey> {
-    let bytes = match from {
-        KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
+pub fn read_public_key_from(from: &KeyBytes, alg: &Option<Algorithm>) -> Result<PublicKey> {
+    let key = match from {
+        KeyBytes::FromStdin(KeyFormat::RawBytes) => {
+            let bytes = read_stdin_bytes()?;
+            PublicKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string("hex-encoded public key")?)?
+            let str = read_stdin_string("hex-encoded public key")?;
+            str.parse()
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
+            let bytes = fs::read(path).map_err(|_| FileNotFound(path.clone()))?;
+            PublicKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
         }
-        KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(path)
-                .map_err(|_| FileNotFound(path.clone()))?
-                .trim(),
-        )?,
-        KeyBytes::HexString(str) => hex::decode(str)?,
+        KeyBytes::FromFile(KeyFormat::HexKey, path) => {
+            let str = fs::read_to_string(path).map_err(|_| FileNotFound(path.clone()))?;
+            str.parse()
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::HexString(str) => str
+            .parse()
+            .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?,
     };
-    PublicKey::from_bytes(&bytes, alg)
-        .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)).into())
+    let key_alg = key.algorithm().into();
+
+    if let Some(a) = alg {
+        if *a != key_alg {
+            Err(std::io::Error::other(format!(
+                "Inconsistent algorithm: key algorithm is {}, expected algorithm is {}",
+                key_alg, a
+            )))?
+        }
+    }
+
+    Ok(key)
 }
 
 pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit> {

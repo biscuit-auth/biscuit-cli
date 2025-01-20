@@ -486,7 +486,7 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
     let query_result;
 
     if let Some(key_from) = public_key_from {
-        let key = read_public_key_from(&key_from, inspect.key_algorithm)?;
+        let key = read_public_key_from(&key_from, &inspect.key_algorithm)?;
         let sig_result = biscuit.verify(key);
         signatures_check = Some(sig_result.is_ok());
 

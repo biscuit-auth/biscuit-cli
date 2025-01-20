@@ -62,7 +62,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     };
 
     let private_key: Option<PrivateKey> = if let Some(f) = private_key_from {
-        Some(read_private_key_from(f, key_pair_cmd.key_algorithm)?)
+        Some(read_private_key_from(f, &key_pair_cmd.key_algorithm)?)
     } else {
         None
     };
@@ -70,7 +70,7 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
     let key_pair = if let Some(private) = private_key {
         KeyPair::from(&private)
     } else {
-        KeyPair::new_with_algorithm(key_pair_cmd.key_algorithm)
+        KeyPair::new_with_algorithm(key_pair_cmd.key_algorithm.unwrap_or_default())
     };
 
     match (
@@ -85,23 +85,20 @@ fn handle_keypair(key_pair_cmd: &KeyPairCmd) -> Result<()> {
             } else {
                 println!("Generating a new random keypair");
             }
-            println!(
-                "Private key: {}",
-                hex::encode(key_pair.private().to_bytes())
-            );
-            println!("Public key: {}", hex::encode(key_pair.public().to_bytes()));
+            println!("Private key: {}", key_pair.private().to_prefixed_string());
+            println!("Public key: {}", key_pair.public());
         }
         (true, true, false, false) => {
             let _ = io::stdout().write_all(&key_pair.private().to_bytes());
         }
         (true, false, false, false) => {
-            println!("{}", hex::encode(key_pair.private().to_bytes()));
+            println!("{}", key_pair.private().to_prefixed_string());
         }
         (false, false, true, true) => {
             let _ = io::stdout().write_all(&key_pair.public().to_bytes());
         }
         (false, false, true, false) => {
-            println!("{}", hex::encode(key_pair.public().to_bytes()));
+            println!("{}", key_pair.public());
         }
         // the other combinations are prevented by clap
         _ => unreachable!(),
@@ -128,7 +125,7 @@ fn handle_generate(generate: &Generate) -> Result<()> {
             // the other combinations are prevented by clap
             _ => unreachable!(),
         },
-        generate.key_algorithm,
+        &generate.key_algorithm,
     );
 
     let root = KeyPair::from(&private_key?);
@@ -284,7 +281,7 @@ fn handle_generate_third_party_block(
             // the other combinations are prevented by clap
             _ => unreachable!(),
         },
-        generate_third_party_block.key_algorithm,
+        &generate_third_party_block.key_algorithm,
     );
 
     let request = read_request_from(&request_from)?;

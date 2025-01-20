@@ -36,7 +36,11 @@ pub struct KeyPairCmd {
     #[clap(long, parse(from_os_str))]
     pub from_private_key_file: Option<PathBuf>,
     /// Read the private key raw bytes directly, with no hex decoding
-    #[clap(long, requires("from-private-key-file"))]
+    #[clap(
+        long,
+        requires("from-private-key-file"),
+        conflicts_with("from-private-key")
+    )]
     pub from_raw_private_key: bool,
     /// Only output the public part of the key pair
     #[clap(long, conflicts_with("only-private-key"))]
@@ -51,8 +55,8 @@ pub struct KeyPairCmd {
     #[clap(long, requires("only-private-key"))]
     pub raw_private_key_output: bool,
     /// Key algorithm: ed25519 (default) or secp256r1
-    #[clap(long, default_value_t)]
-    pub key_algorithm: Algorithm,
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
 }
 
 /// Generate a biscuit from a private key and an authority block
@@ -84,8 +88,8 @@ pub struct Generate {
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
     /// Key algorithm: ed25519 (default) or secp256r1
-    #[clap(long, default_value_t)]
-    pub key_algorithm: Algorithm,
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
     /// The optional context string attached to the authority block
     #[clap(long)]
     pub context: Option<String>,
@@ -150,8 +154,8 @@ pub struct Inspect {
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     pub raw_public_key: bool,
     /// Key algorithm: ed25519 (default) or secp256r1
-    #[clap(long, default_value_t)]
-    pub key_algorithm: Algorithm,
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
     #[clap(flatten)]
     pub run_limits_args: common_args::RunLimitArgs,
     #[clap(flatten)]
@@ -228,8 +232,8 @@ pub struct GenerateThirdPartyBlock {
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
     /// Key algorithm: ed25519 (default) or secp256r1
-    #[clap(long, default_value_t)]
-    pub key_algorithm: Algorithm,
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
     /// Output the block raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
