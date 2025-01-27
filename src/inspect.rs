@@ -17,6 +17,7 @@ use crate::input::*;
 
 #[derive(Serialize, Debug)]
 struct TokenBlock {
+    version: u32,
     code: String,
     external_key: Option<String>,
     revocation_id: String,
@@ -27,6 +28,16 @@ struct TokenDescription {
     sealed: bool,
     root_key_id: Option<u32>,
     blocks: Vec<TokenBlock>,
+}
+
+fn get_version_string(v: u32) -> String {
+    match v {
+        3 => "v3.0".to_string(),
+        4 => "v3.1".to_string(),
+        5 => "v3.2".to_string(),
+        6 => "v3.3".to_string(),
+        _ => "(unsupported version)".to_string(),
+    }
 }
 
 impl Display for TokenDescription {
@@ -54,7 +65,7 @@ impl Display for TokenDescription {
                 writeln!(f, "Block n°{}:", i)?;
             }
 
-            writeln!(f, "== Datalog ==")?;
+            writeln!(f, "== Datalog {} ==", get_version_string(block.version))?;
             writeln!(f, "{}", block.code)?;
 
             writeln!(f, "== Revocation id ==")?;
@@ -472,6 +483,7 @@ pub fn handle_inspect_inner(inspect: &Inspect) -> Result<InspectionResults> {
                 .get(i)
                 .map(hex::encode)
                 .unwrap_or_else(|| "n/a".to_owned()),
+            version: biscuit.block_version(i)?,
         });
     }
 

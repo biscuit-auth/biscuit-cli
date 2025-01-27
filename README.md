@@ -73,7 +73,7 @@ By default, `biscuit` inspect only prints out the biscuit contents (datalog bloc
 $ # this will inspect the token stored in the given file
 $ biscuit inspect biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==
@@ -91,7 +91,7 @@ A public key can be provided to check the biscuit root key (the command exits wi
 $ # this will make sure the biscuit root key is the same as the one that's provided
 $ biscuit inspect --public-key-file public-key-file biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==
@@ -112,7 +112,7 @@ $ biscuit inspect --public-key-file public-key-file \
                   --authorize-with 'allow if right("file1");' \
                   biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==
