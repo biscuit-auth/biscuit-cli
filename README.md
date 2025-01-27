@@ -39,8 +39,8 @@ Here are a list of common use-cases:
 $ # this will output the keypair, you can then copy/paste the components
 $ biscuit keypair
 > Generating a new random keypair
-> Private key: d1e3ebc3f522cc2f7bb40c2377830d834c41ebeb0aa54d881a75059704dfa6cb
-> Public key: 80c596ea5a6ade1a2f8e7bf96359732d9274789d8e85c0a0a62adbff16f4b289
+> Private key: ed25519/d1e3ebc3f522cc2f7bb40c2377830d834c41ebeb0aa54d881a75059704dfa6cb
+> Public key: ed25519/80c596ea5a6ade1a2f8e7bf96359732d9274789d8e85c0a0a62adbff16f4b289
 
 $ # this will save the private key to a file so you can use it later
 $ biscuit keypair --only-private-key > private-key-file
@@ -50,7 +50,7 @@ $ biscuit keypair --only-private-key > private-key-file
 
 ```sh
 $ biscuit keypair --from-private-key-file private-key-file --only-public-key
-> 2341bc530d8f074100734a41cc05cc82e4e2564eff61b0408f8e37a08f384767
+> ed25519/2341bc530d8f074100734a41cc05cc82e4e2564eff61b0408f8e37a08f384767
 ```
 
 ### Create a biscuit token
@@ -73,7 +73,7 @@ By default, `biscuit` inspect only prints out the biscuit contents (datalog bloc
 $ # this will inspect the token stored in the given file
 $ biscuit inspect biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==
@@ -91,7 +91,7 @@ A public key can be provided to check the biscuit root key (the command exits wi
 $ # this will make sure the biscuit root key is the same as the one that's provided
 $ biscuit inspect --public-key-file public-key-file biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==
@@ -112,7 +112,7 @@ $ biscuit inspect --public-key-file public-key-file \
                   --authorize-with 'allow if right("file1");' \
                   biscuit-file
 > Authority block:
-> == Datalog ==
+> == Datalog v3.0 ==
 > right("file1");
 > 
 > == Revocation id ==

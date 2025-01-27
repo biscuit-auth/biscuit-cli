@@ -1,3 +1,11 @@
+# `0.6.0-beta.1`
+
+- biscuit-auth 6.0.0-beta.1
+  - biscuit-datalog v3.3 support
+  - ECDSA signatures support
+  - policy snapshots support
+- display datalog version in blocks
+
 # `0.5.0`
 
 - biscuit-auth 5.0.0

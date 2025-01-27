@@ -1,3 +1,4 @@
+use biscuit_auth::Algorithm;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -15,8 +16,8 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "keypair")]
     KeyPairCmd(KeyPairCmd),
-    Inspect(Inspect),
-    InspectSnapshot(InspectSnapshot),
+    Inspect(Box<Inspect>),
+    InspectSnapshot(Box<InspectSnapshot>),
     Generate(Generate),
     Attenuate(Attenuate),
     GenerateRequest(GenerateRequest),
@@ -35,7 +36,11 @@ pub struct KeyPairCmd {
     #[clap(long, parse(from_os_str))]
     pub from_private_key_file: Option<PathBuf>,
     /// Read the private key raw bytes directly, with no hex decoding
-    #[clap(long, requires("from-private-key-file"))]
+    #[clap(
+        long,
+        requires("from-private-key-file"),
+        conflicts_with("from-private-key")
+    )]
     pub from_raw_private_key: bool,
     /// Only output the public part of the key pair
     #[clap(long, conflicts_with("only-private-key"))]
@@ -49,6 +54,9 @@ pub struct KeyPairCmd {
     /// Output the private key raw bytes directly, with no hex encoding
     #[clap(long, requires("only-private-key"))]
     pub raw_private_key_output: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
 }
 
 /// Generate a biscuit from a private key and an authority block
@@ -79,6 +87,9 @@ pub struct Generate {
     /// Read the private key raw bytes directly (only available when reading the private key from a file)
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
     /// The optional context string attached to the authority block
     #[clap(long)]
     pub context: Option<String>,
@@ -142,6 +153,11 @@ pub struct Inspect {
     /// Read the public key raw bytes directly
     #[clap(long, requires("public-key-file"), conflicts_with("public-key"))]
     pub raw_public_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
+    #[clap(flatten)]
+    pub run_limits_args: common_args::RunLimitArgs,
     #[clap(flatten)]
     pub authorization_args: common_args::AuthorizeArgs,
     #[clap(flatten)]
@@ -154,6 +170,12 @@ pub struct Inspect {
     /// Output the snapshot raw bytes directly, with no base64 encoding
     #[clap(long, requires("dump-snapshot-to"))]
     pub dump_raw_snapshot: bool,
+    /// Save an authorizer builder snapshot to a file
+    #[clap(long, parse(from_os_str))]
+    pub dump_policies_snapshot_to: Option<PathBuf>,
+    /// Output the snapshot raw bytes directly, with no base64 encoding
+    #[clap(long, requires("dump-snapshot-to"))]
+    pub dump_raw_raw_policies_snapshot: bool,
 }
 
 /// Inspect a snapshot
@@ -169,7 +191,7 @@ pub struct InspectSnapshot {
     #[clap(long)]
     pub raw_input: bool,
     #[clap(flatten)]
-    pub authorization_args: common_args::AuthorizeArgs,
+    pub run_limits_args: common_args::RunLimitArgs,
     #[clap(flatten)]
     pub query_args: common_args::QueryArgs,
     #[clap(flatten)]
@@ -209,6 +231,9 @@ pub struct GenerateThirdPartyBlock {
     /// Read the private key raw bytes directly (only available when reading the private key from a file)
     #[clap(long, conflicts_with = "private-key", requires = "private-key-file")]
     pub raw_private_key: bool,
+    /// Key algorithm: ed25519 (default) or secp256r1
+    #[clap(long)]
+    pub key_algorithm: Option<Algorithm>,
     /// Output the block raw bytes directly, with no base64 encoding
     #[clap(long)]
     pub raw_output: bool,
@@ -254,13 +279,32 @@ mod common_args {
     pub struct ParamArg {
         /// Provide a value for a datalog parameter. `type` is optional and defaults to `string`. Possible types are pubkey, string, integer, date, bytes or bool.
         /// Bytes values must be hex-encoded and start with `hex:`
-        /// Public keys must be hex-encoded and start with `ed25519/`
+        /// Public keys must be hex-encoded and start with `ed25519/` or `secp256r1/`
         #[clap(
         long,
         value_parser = clap::builder::ValueParser::new(parse_param),
         value_name = "key[:type]=value"
     )]
         pub param: Vec<Param>,
+    }
+
+    /// Arguments related to runtime limits
+    #[derive(Parser)]
+    pub struct RunLimitArgs {
+        /// Configure the maximum amount of facts that can be generated
+        /// before aborting evaluation
+        #[clap(long)]
+        pub max_facts: Option<u64>,
+        /// Configure the maximum amount of iterations before aborting
+        /// evaluation
+        #[clap(long)]
+        pub max_iterations: Option<u64>,
+        /// Configure the maximum evaluation duration before aborting
+        #[clap(
+            long,
+            parse(try_from_str = parse_duration)
+        )]
+        pub max_time: Option<Duration>,
     }
 
     /// Arguments related to running authorization
@@ -271,7 +315,9 @@ mod common_args {
             long,
             alias("verify-interactive"),
             conflicts_with("authorize-with"),
-            conflicts_with("authorize-with-file")
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file")
         )]
         pub authorize_interactive: bool,
         /// Authorize the biscuit with the provided authorizer.
@@ -280,6 +326,8 @@ mod common_args {
             parse(from_os_str),
             alias("verify-with-file"),
             conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file"),
             conflicts_with("authorize-interactive")
         )]
         pub authorize_with_file: Option<PathBuf>,
@@ -288,36 +336,34 @@ mod common_args {
             long,
             alias("verify-with"),
             conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-with-snapshot-file"),
             conflicts_with("authorize-interactive")
         )]
         pub authorize_with: Option<String>,
-        /// Configure the maximum amount of facts that can be generated
-        /// before aborting evaluation
+        /// Authorize the biscuit with the provided snapshot
+        /// The snapshot must not be evaluated
         #[clap(
             long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file")
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot-file"),
+            conflicts_with("authorize-interactive")
         )]
-        pub max_facts: Option<u64>,
-        /// Configure the maximum amount of iterations before aborting
-        /// evaluation
+        pub authorize_with_snapshot: Option<String>,
+        /// Authorize the biscuit with the provided snapshot
+        /// The snapshot must not be evaluated
         #[clap(
             long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file")
+            conflicts_with("authorize-with"),
+            conflicts_with("authorize-with-file"),
+            conflicts_with("authorize-with-snapshot"),
+            conflicts_with("authorize-interactive")
         )]
-        pub max_iterations: Option<u64>,
-        /// Configure the maximum evaluation duration before aborting
-        #[clap(
-            long,
-            requires("authorize-with"),
-            requires("authorize-interactive"),
-            requires("authorize-with-file"),
-            parse(try_from_str = parse_duration)
-        )]
-        pub max_time: Option<Duration>,
+        pub authorize_with_snapshot_file: Option<PathBuf>,
+        /// Read the snapshot from a binary file
+        #[clap(long, requires("authorize-with-snapshot-file"))]
+        pub authorize_with_raw_snapshot_file: bool,
         /// Include the current time in the verifier facts
         #[clap(long)]
         pub include_time: bool,

@@ -2,7 +2,8 @@ use anyhow::Result;
 use atty::Stream;
 use biscuit_auth::{
     builder::{BiscuitBuilder, BlockBuilder, Rule, Term},
-    Authorizer, ThirdPartyRequest, UnverifiedBiscuit, {PrivateKey, PublicKey},
+    Algorithm, Authorizer, AuthorizerBuilder, PrivateKey, PublicKey, ThirdPartyRequest,
+    UnverifiedBiscuit,
 };
 use chrono::{DateTime, Duration, Utc};
 use parse_duration as duration_parser;
@@ -48,6 +49,16 @@ pub enum DatalogInput {
     FromStdin,
     FromFile(PathBuf),
     DatalogString(String),
+}
+
+pub enum AuthorizerInput {
+    FromDatalog(DatalogInput, Vec<Param>),
+    FromSnapshot(SnapshotInput),
+}
+
+pub enum SnapshotInput {
+    FromFile(PathBuf, BiscuitFormat),
+    FromString(String),
 }
 
 pub fn ensure_no_input_conflict(datalog: &DatalogInput, biscuit: &BiscuitBytes) -> Result<()> {
@@ -131,8 +142,8 @@ pub fn read_authority_from(
     from: &DatalogInput,
     all_params: &[Param],
     context: &Option<String>,
-    builder: &mut BiscuitBuilder,
-) -> Result<()> {
+    builder: BiscuitBuilder,
+) -> Result<BiscuitBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -153,22 +164,22 @@ pub fn read_authority_from(
         }
     }
 
-    builder
-        .add_code_with_params(&string, params, scope_params)
+    let mut builder = builder
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
     if let Some(ctx) = context {
-        builder.set_context(ctx.to_owned());
+        builder = builder.context(ctx.to_owned());
     }
 
-    Ok(())
+    Ok(builder)
 }
 
 pub fn read_block_from(
     from: &DatalogInput,
     all_params: &[Param],
     context: &Option<String>,
-    builder: &mut BlockBuilder,
-) -> Result<()> {
+    builder: BlockBuilder,
+) -> Result<BlockBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -188,22 +199,30 @@ pub fn read_block_from(
             }
         }
     }
-    builder
-        .add_code_with_params(&string, params, scope_params)
+    let mut builder = builder
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
     if let Some(ctx) = context {
-        builder.set_context(ctx.to_owned());
+        builder = builder.context(ctx.to_owned());
     }
 
-    Ok(())
+    Ok(builder)
 }
 
-pub fn read_authorizer_from(
+pub fn read_authorizer_from(from: &AuthorizerInput) -> Result<AuthorizerBuilder> {
+    match from {
+        AuthorizerInput::FromDatalog(datalog, all_params) => {
+            read_authorizer_from_datalog(datalog, all_params)
+        }
+        AuthorizerInput::FromSnapshot(snapshot) => read_authorizer_from_snapshot(snapshot),
+    }
+}
+
+pub fn read_authorizer_from_datalog(
     from: &DatalogInput,
     all_params: &[Param],
-    authorizer: &mut Authorizer,
-) -> Result<()> {
+) -> Result<AuthorizerBuilder> {
     let string = match from {
         DatalogInput::FromEditor => read_editor_string()?,
         DatalogInput::FromStdin => read_stdin_string("datalog program")?,
@@ -223,51 +242,112 @@ pub fn read_authorizer_from(
             }
         }
     }
-    authorizer
-        .add_code_with_params(&string, params, scope_params)
+    let builder = AuthorizerBuilder::new()
+        .code_with_params(&string, params, scope_params)
         .map_err(|e| ParseError("datalog statements".to_string(), e.to_string()))?;
 
-    Ok(())
+    Ok(builder)
 }
 
-pub fn read_private_key_from(from: &KeyBytes) -> Result<PrivateKey> {
-    let bytes = match from {
-        KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
-        KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string("hex-encoded private key")?)?
+fn read_authorizer_from_snapshot(
+    snapshot: &SnapshotInput,
+) -> std::result::Result<AuthorizerBuilder, anyhow::Error> {
+    let builder = match snapshot {
+        SnapshotInput::FromFile(path, BiscuitFormat::RawBiscuit) => {
+            AuthorizerBuilder::from_raw_snapshot(
+                &fs::read(path).map_err(|_| FileNotFound(path.clone()))?,
+            )?
         }
-        KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
+        SnapshotInput::FromFile(path, BiscuitFormat::Base64Biscuit) => {
+            AuthorizerBuilder::from_base64_snapshot(
+                fs::read_to_string(path)
+                    .map_err(|_| FileNotFound(path.clone()))?
+                    .trim(),
+            )?
         }
-        KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(path)
-                .map_err(|_| FileNotFound(path.clone()))?
-                .trim(),
-        )?,
-        KeyBytes::HexString(str) => hex::decode(str)?,
+        SnapshotInput::FromString(str) => AuthorizerBuilder::from_base64_snapshot(str)?,
     };
-    PrivateKey::from_bytes(&bytes)
-        .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)).into())
+    Ok(builder)
 }
 
-pub fn read_public_key_from(from: &KeyBytes) -> Result<PublicKey> {
-    let bytes = match from {
-        KeyBytes::FromStdin(KeyFormat::RawBytes) => read_stdin_bytes()?,
+pub fn read_private_key_from(from: &KeyBytes, alg: &Option<Algorithm>) -> Result<PrivateKey> {
+    let key = match from {
+        KeyBytes::FromStdin(KeyFormat::RawBytes) => {
+            let bytes = read_stdin_bytes()?;
+            PrivateKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
+        }
         KeyBytes::FromStdin(KeyFormat::HexKey) => {
-            hex::decode(read_stdin_string("hex-encoded public key")?)?
+            let str = read_stdin_string("hex-encoded private key")?;
+            str.parse()
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
         }
         KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
-            fs::read(path).map_err(|_| FileNotFound(path.clone()))?
+            let bytes = fs::read(path).map_err(|_| FileNotFound(path.clone()))?;
+            PrivateKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
         }
-        KeyBytes::FromFile(KeyFormat::HexKey, path) => hex::decode(
-            fs::read_to_string(path)
-                .map_err(|_| FileNotFound(path.clone()))?
-                .trim(),
-        )?,
-        KeyBytes::HexString(str) => hex::decode(str)?,
+        KeyBytes::FromFile(KeyFormat::HexKey, path) => {
+            let str = fs::read_to_string(path).map_err(|_| FileNotFound(path.clone()))?;
+            str.parse()
+                .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::HexString(str) => str
+            .parse()
+            .map_err(|e| ParseError("private key".to_string(), format!("{}", &e)))?,
     };
-    PublicKey::from_bytes(&bytes)
-        .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)).into())
+    let key_alg = key.algorithm().into();
+
+    if let Some(a) = alg {
+        if *a != key_alg {
+            Err(std::io::Error::other(format!(
+                "Inconsistent algorithm: key algorithm is {}, expected algorithm is {}",
+                key_alg, a
+            )))?
+        }
+    }
+
+    Ok(key)
+}
+
+pub fn read_public_key_from(from: &KeyBytes, alg: &Option<Algorithm>) -> Result<PublicKey> {
+    let key = match from {
+        KeyBytes::FromStdin(KeyFormat::RawBytes) => {
+            let bytes = read_stdin_bytes()?;
+            PublicKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::FromStdin(KeyFormat::HexKey) => {
+            let str = read_stdin_string("hex-encoded public key")?;
+            str.parse()
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::FromFile(KeyFormat::RawBytes, path) => {
+            let bytes = fs::read(path).map_err(|_| FileNotFound(path.clone()))?;
+            PublicKey::from_bytes(&bytes, alg.unwrap_or_default())
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::FromFile(KeyFormat::HexKey, path) => {
+            let str = fs::read_to_string(path).map_err(|_| FileNotFound(path.clone()))?;
+            str.parse()
+                .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?
+        }
+        KeyBytes::HexString(str) => str
+            .parse()
+            .map_err(|e| ParseError("public key".to_string(), format!("{}", &e)))?,
+    };
+    let key_alg = key.algorithm().into();
+
+    if let Some(a) = alg {
+        if *a != key_alg {
+            Err(std::io::Error::other(format!(
+                "Inconsistent algorithm: key algorithm is {}, expected algorithm is {}",
+                key_alg, a
+            )))?
+        }
+    }
+
+    Ok(key)
 }
 
 pub fn read_biscuit_from(from: &BiscuitBytes) -> Result<UnverifiedBiscuit> {
@@ -424,7 +504,7 @@ pub fn parse_param(kv: &str) -> Result<Param, std::io::Error> {
         ))?;
         let bytes =
             hex::decode(hex_key).map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)));
-        let pubkey = PublicKey::from_bytes(&bytes?)
+        let pubkey = PublicKey::from_bytes(&bytes?, Algorithm::Ed25519)
             .map_err(|e| Error::new(ErrorKind::Other, format!("{}", &e)))?;
         Ok(Param::PublicKey(name.to_string(), pubkey))
       },
