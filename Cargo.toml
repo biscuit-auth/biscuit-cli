@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 atty = "0.2.14"
-biscuit-auth = { version = "6.0.0-beta.1", features = ["serde-error"] }
+biscuit-auth = { version = "6.0.0-beta.1", features = ["serde-error", "pem"] }
 clap = { version = "^3.0", features = ["color", "derive"] }
 chrono = "^0.4"
 hex = "0.4.3"
